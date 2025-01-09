@@ -16,7 +16,6 @@ app.use(
 app.use("/logos", express.static(path.join(__dirname, "public/logos")));
 app.use("/staff", express.static(path.join(__dirname, "public/staff")));
 
-
 // File Upload Directory
 // const uploadDir = path.join(__dirname, "public/user_report");
 // if (!fs.existsSync(uploadDir)) {
@@ -82,30 +81,242 @@ async function run() {
 
     const CSOCollection = client.db("finance_office").collection("cso");
     const StaffCollection = client.db("finance_office").collection("staff");
-    app.post("/registerStaff", uploadStaffPhoto.single("photo"), async (req, res) => {
+    const UserCollection = client.db("finance_office").collection("users");
+
+    // app.post("/createAccount_users", async (req, res) => {
+    //   try {
+    //     const data = req.body;
+    //       console.log(data);
+    //       const result = await UserCollection.insertOne(data);
+    //       res.json({
+    //         success: true,
+    //         message: "create account successfully.",
+    //         result,
+    //       });
+    //   } catch (error) {
+    //     console.error("Error account user:", error);
+    //     res
+    //       .status(500)
+    //       .json({ success: false, message: "Internal Server Error" });
+    //   }
+    // });
+    
+    app.post("/createAccount_users", async (req, res) => {
+  try {
+    const { registrationId, password } = req.body;
+
+    // Validate input
+    if (!registrationId || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Registration ID and password are required.",
+      });
+    }
+
+    // Check in StaffCollection
+    let user = await StaffCollection.findOne({ registrationId });
+
+    // If not found, check in CSOCollection
+    if (!user) {
+      user = await CSOCollection.findOne({ registrationId });
+    }
+
+    // If no matching record found
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No record found for the provided registration ID.",
+      });
+    }
+
+    // Prepare user account data
+    const userAccount = {
+      registrationId: user.registrationId,
+      name: user.name || user.csoName, // Staff uses `name`, CSO uses `csoName`
+      email: user.email,
+      role: user.role || "CSO", // Staff uses `role`, default "CSO" for CSOs
+      status: user.status,
+      password, // Store a hashed version of the password in production
+      createdAt: new Date(),
+    };
+
+    // Insert user account
+    const result = await UserCollection.insertOne(userAccount);
+
+    res.json({
+      success: true,
+      message: "User account created successfully.",
+      result,
+    });
+  } catch (error) {
+    console.error("Error creating user account:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+});
+
+    app.get("/users", async (req, res) => {
+      try {
+        const users = await UserCollection.find().toArray();
+        res.json(users);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Internal Server Error" });
+      }
+    });
+    app.get("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const result = await UserCollection.findOne(filter);
+      res.send(result);
+    });
+
+    app.post("/registerStaff", uploadStaffPhoto.single("photo"),
+      async (req, res) => {
+        try {
+          const data = req.body;
+          data.registrationId = `Staff-${Date.now()}`;
+          data.status = "active";
+          if (req.file) {
+            data.photo = req.file.filename;
+
+            console.log(data);
+            const result = await StaffCollection.insertOne(data);
+            res.json({
+              success: true,
+              message: "Staff registered successfully.",
+              result,
+            });
+          } else {
+            res
+              .status(400)
+              .json({ success: false, message: "No file uploaded" });
+          }
+        } catch (error) {
+          console.error("Error registering Staff:", error);
+          res
+            .status(500)
+            .json({ success: false, message: "Internal Server Error" });
+        }
+      }
+    );
+    app.get("/staff", async (req, res) => {
+      try {
+        const staff = await StaffCollection.find().toArray();
+        res.json(staff);
+      } catch (error) {
+        console.error("Error fetching staffs:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Internal Server Error" });
+      }
+    });
+    app.get("/staff/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const result = await StaffCollection.findOne(filter);
+      res.send(result);
+    });
+
+
+
+    // Route: Register CSO
+
+    app.post("/registerCSO", uploadLogo.single("logo"), async (req, res) => {
       try {
         const data = req.body;
-        data.csoId = `Staff-${Date.now()}`;
+        data.registrationId = `CSO-${Date.now()}`;
         data.status = "active";
+        data.date = new Date();
         if (req.file) {
-          data.photo = req.file.filename;
-    
+          data.logo = req.file.filename;
+
           console.log(data);
-          const result = await StaffCollection.insertOne(data);
+          const result = await CSOCollection.insertOne(data);
           res.json({
             success: true,
-            message: "Staff registered successfully.",
+            message: "CSO registered successfully.",
             result,
           });
         } else {
           res.status(400).json({ success: false, message: "No file uploaded" });
         }
       } catch (error) {
-        console.error("Error registering Staff:", error);
-        res.status(500).json({ success: false, message: "Internal Server Error" });
+        console.error("Error registering CSO:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Internal Server Error" });
       }
     });
-    
+
+    // Route: Get All CSOs
+    app.get("/csos", async (req, res) => {
+      try {
+        const csos = await CSOCollection.find().toArray();
+        res.json(csos);
+      } catch (error) {
+        console.error("Error fetching CSOs:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Internal Server Error" });
+      }
+    });
+    app.get("/csos/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const result = await CSOCollection.findOne(filter);
+      res.send(result);
+    });
+    // Route: Update CSO Status
+    app.patch("/updateCSOStatus/:id", async (req, res) => {
+      const id = req.params.id;
+      const { status } = req.body;
+      try {
+        const result = await CSOCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status } }
+        );
+        res.json({
+          success: true,
+          message: "CSO status updated successfully.",
+          result,
+        });
+      } catch (error) {
+        console.error("Error updating CSO status:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Internal Server Error" });
+      }
+    });
+
+    // Update CSO status
+    app.patch("/updateCSOStatus/:id", async (req, res) => {
+      const id = req.params.id;
+      const { status } = req.body;
+      try {
+        const result = await CSOCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status } }
+        );
+        res.json({
+          success: true,
+          message: "CSO status updated successfully.",
+          result,
+        });
+      } catch (error) {
+        console.error("Error updating CSO status:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Internal Server Error" });
+      }
+    });
+
+
+    //
 
     app.post("/userReports", upload.single("pdfFile"), async (req, res) => {
       try {
@@ -185,92 +396,6 @@ async function run() {
       const filter = { _id: new ObjectId(id) };
       const result = await UserReportsCollection.findOne(filter);
       res.send(result);
-    });
-
-    // Route: Register CSO
-
-    app.post("/registerCSO", uploadLogo.single("logo"), async (req, res) => {
-      try {
-        const data = req.body;
-        data.csoId = `CSO-${Date.now()}`;
-        data.status = "active";
-        data.date = new Date();
-        if (req.file) {
-          data.logo = req.file.filename;
-
-          console.log(data);
-          const result = await CSOCollection.insertOne(data);
-          res.json({
-            success: true,
-            message: "CSO registered successfully.",
-            result,
-          });
-        } else {
-          res.status(400).json({ success: false, message: "No file uploaded" });
-        }
-      } catch (error) {
-        console.error("Error registering CSO:", error);
-        res
-          .status(500)
-          .json({ success: false, message: "Internal Server Error" });
-      }
-    });
-
-    // Route: Get All CSOs
-    app.get("/csos", async (req, res) => {
-      try {
-        const csos = await CSOCollection.find().toArray();
-        res.json(csos);
-      } catch (error) {
-        console.error("Error fetching CSOs:", error);
-        res
-          .status(500)
-          .json({ success: false, message: "Internal Server Error" });
-      }
-    });
-
-    // Route: Update CSO Status
-    app.patch("/updateCSOStatus/:id", async (req, res) => {
-      const id = req.params.id;
-      const { status } = req.body;
-      try {
-        const result = await CSOCollection.updateOne(
-          { _id: new ObjectId(id) },
-          { $set: { status } }
-        );
-        res.json({
-          success: true,
-          message: "CSO status updated successfully.",
-          result,
-        });
-      } catch (error) {
-        console.error("Error updating CSO status:", error);
-        res
-          .status(500)
-          .json({ success: false, message: "Internal Server Error" });
-      }
-    });
-
-    // Update CSO status
-    app.patch("/updateCSOStatus/:id", async (req, res) => {
-      const id = req.params.id;
-      const { status } = req.body;
-      try {
-        const result = await CSOCollection.updateOne(
-          { _id: new ObjectId(id) },
-          { $set: { status } }
-        );
-        res.json({
-          success: true,
-          message: "CSO status updated successfully.",
-          result,
-        });
-      } catch (error) {
-        console.error("Error updating CSO status:", error);
-        res
-          .status(500)
-          .json({ success: false, message: "Internal Server Error" });
-      }
     });
     console.log("Connected to MongoDB!");
   } catch (err) {
