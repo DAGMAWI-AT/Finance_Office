@@ -9,5 +9,6 @@ router.post("/createAccount", createAccount);
 router.get("/users", getUsers);
 router.get("/:id", getUsersId);
 
+router.get("/", (req, res) => res.send("Hello Dagi!"));
 
 module.exports = router;
