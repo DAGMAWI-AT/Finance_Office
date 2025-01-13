@@ -6,6 +6,8 @@ const path = require("path");
 const fs = require("fs");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 8000;
+const jwt = require("jsonwebtoken"); // Import jsonwebtoken
+const {secretKey} = require("./configration/jwtConfig"); 
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -83,24 +85,72 @@ async function run() {
     const StaffCollection = client.db("finance_office").collection("staff");
     const UserCollection = client.db("finance_office").collection("users");
 
-    // app.post("/createAccount_users", async (req, res) => {
-    //   try {
-    //     const data = req.body;
-    //       console.log(data);
-    //       const result = await UserCollection.insertOne(data);
-    //       res.json({
-    //         success: true,
-    //         message: "create account successfully.",
-    //         result,
-    //       });
-    //   } catch (error) {
-    //     console.error("Error account user:", error);
-    //     res
-    //       .status(500)
-    //       .json({ success: false, message: "Internal Server Error" });
-    //   }
-    // });
+    app.post("/login", async (req, res) => {
+      try {
+        const { registrationId, password } = req.body;
     
+        // Validate input
+        if (!registrationId || !password) {
+          return res.status(400).json({
+            success: false,
+            message: "Registration ID and password are required.",
+          });
+        }
+    
+        // Find user in database
+        const user = await UserCollection.findOne({ registrationId });
+        if (!user) {
+          return res.status(404).json({
+            success: false,
+            message: "No user found with the provided registration ID.",
+          });
+        }
+    
+        // Validate password (consider using bcrypt for secure password comparison)
+        const isPasswordValid = password === user.password; // Replace with bcrypt comparison
+        if (!isPasswordValid) {
+          return res.status(401).json({
+            success: false,
+            message: "Invalid password. Please try again.",
+          });
+        }
+    
+        // Generate JWT token
+        const token = jwt.sign(
+          { id: user._id,registrationId:user.registrationId, role: user.role }, // Payload
+          secretKey, // Secret key
+          { expiresIn: "1h" } // Token expiration
+        );
+      
+        const refreshToken = jwt.sign({ id: user._id }, secretKey, { expiresIn: "1h" }); // Longer expiry for refresh token
+    refreshTokens.push(refreshToken);
+    
+        // Send token in the response
+        res.status(200).json({
+          success: true,
+          message: "Login successful.",
+          token: token,
+          user: {
+            registrationId: user.registrationId,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          },
+        });
+      } catch (error) {
+        console.error("Error during login:", error);
+        res.status(500).json({
+          success: false,
+          message: "Internal Server Error",
+        });
+      }
+    });
+    app.post("/logout", (req, res) => {
+      // Clear the token from the cookies
+      res.clearCookie("token"); 
+      res.clearCookie("user"); // Clear the token from the cookie
+      return res.json({ message: "Successfully logged out" });
+    });
     app.post("/createAccount_users", async (req, res) => {
   try {
     const { registrationId, password } = req.body;
@@ -132,7 +182,8 @@ async function run() {
     // Prepare user account data
     const userAccount = {
       registrationId: user.registrationId,
-      name: user.name || user.csoName, // Staff uses `name`, CSO uses `csoName`
+      name: user.name || user.csoName,      // Staff uses `name`, CSO uses `csoName`
+      userId : `${user.name}-${Date.now()}`||`{user.csoName}-${Date.now()}`,
       email: user.email,
       role: user.role || "CSO", // Staff uses `role`, default "CSO" for CSOs
       status: user.status,
