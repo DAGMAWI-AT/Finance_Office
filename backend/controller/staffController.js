@@ -55,9 +55,18 @@ const getStaff = async(req,res)=>{
           .json({ success: false, message: "Internal Server Error" });
       }
 }
+
+//get single staff data
+const getStaffById = async(req,res)=>{
+const id = req.params.id;
+const filter = { _id: new ObjectId(id) };
+const result = await StaffCollection.findOne(filter);
+res.send(result);
+}
 // Export the function and multer middleware
 module.exports = {
   uploadStaffPhoto,
   registerStaff,
   getStaff,
+  getStaffById,
 };
