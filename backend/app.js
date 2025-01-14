@@ -9,11 +9,12 @@ const { secretKey } = require("./configration/jwtConfig");
 const userRoutes = require("./routes/userRoute");
 const staffRoute = require("./routes/staffRoute");
 const csoRoute = require("./routes/csoRoute");
-
+const authRoute = require("./routes/authRoute")
 const { connectDB } = require("./configration/db"); // Import the connectDB function
 
 const port = process.env.PORT || 8000;
 const app = express();
+require("dotenv").config();
 
 // Middleware
 app.use(cors());
@@ -25,7 +26,7 @@ app.use("/user", userRoutes);
 app.use("/staff", staffRoute)
 app.use("/cso", csoRoute)
 
-
+app.use("/api/auth", authRoute)
 // MongoDB Setup
 async function run() {
   await connectDB(); // Make sure the DB is connected before starting the server

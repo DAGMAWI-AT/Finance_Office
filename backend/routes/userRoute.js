@@ -1,13 +1,15 @@
 // src/routes/userRoutes.js
 const express = require("express");
-const { login, createAccount, getUsers, getUsersId } = require("../controller/userController");
-
+const { login, createAccount, getUsers, getUsersId, logout } = require("../controller/userController");
+const verifyToken = require("../middleware/authMiddleware");
+const authorizeRoles = require("../middleware/roleMiddleware");
 const router = express.Router();
 
 router.post("/login", login);
-router.post("/createAccount", createAccount);
-router.get("/users", getUsers);
-router.get("/:id", getUsersId);
+router.post("/logout", logout)
+router.post("/createAccount",verifyToken, authorizeRoles("admin"), createAccount);
+router.get("/users", verifyToken, authorizeRoles("admin"), getUsers);
+router.get("/:id", verifyToken, authorizeRoles("admin"), getUsersId);
 
 router.get("/", (req, res) => res.send("Hello Dagi!"));
 

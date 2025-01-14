@@ -122,21 +122,25 @@ async function run() {
           { expiresIn: "1h" } // Token expiration
         );
       
-        const refreshToken = jwt.sign({ id: user._id }, secretKey, { expiresIn: "1h" }); // Longer expiry for refresh token
-    refreshTokens.push(refreshToken);
+    //     const refreshToken = jwt.sign({ id: user._id }, secretKey, { expiresIn: "1h" }); // Longer expiry for refresh token
+    // refreshTokens.push(refreshToken);
     
         // Send token in the response
         res.status(200).json({
           success: true,
           message: "Login successful.",
           token: token,
-          user: {
-            registrationId: user.registrationId,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-          },
+          role: user.role,
+          // user: {
+          // //   registrationId: user.registrationId,
+          // //   name: user.name,
+          // //   email: user.email,
+          // //   role: user.role,
+          // role: user.role
+
+          // },
         });
+        // res.status(200).json({token});
       } catch (error) {
         console.error("Error during login:", error);
         res.status(500).json({
@@ -162,7 +166,13 @@ async function run() {
         message: "Registration ID and password are required.",
       });
     }
-
+    const existingUserAccount = await UserCollection.findOne({ registrationId });
+    if (existingUserAccount) {
+      return res.status(400).json({
+        success: false,
+        message: "An account already exists for the provided registration ID.",
+      });
+    }
     // Check in StaffCollection
     let user = await StaffCollection.findOne({ registrationId });
 
@@ -183,7 +193,7 @@ async function run() {
     const userAccount = {
       registrationId: user.registrationId,
       name: user.name || user.csoName,      // Staff uses `name`, CSO uses `csoName`
-      userId : `${user.name}-${Date.now()}`||`{user.csoName}-${Date.now()}`,
+      userId : `${user.name}-${Date.now()}`||`${user.csoName}-${Date.now()}`,
       email: user.email,
       role: user.role || "CSO", // Staff uses `role`, default "CSO" for CSOs
       status: user.status,

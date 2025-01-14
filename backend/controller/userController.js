@@ -1,8 +1,15 @@
 // src/controllers/userController.js
 const { UserCollection } = require("../model/user");
 const jwt = require("jsonwebtoken");
-const { secretKey } = require("../configration/jwtConfig");
+require('dotenv').config();
+
+// const { secretKey } = require("../configration/jwtConfig");
+const secretKey = process.env.JWT_secretKey;
+if (!secretKey) {
+  throw new Error("JWT_secretKey is not set in the environment variables.");
+}
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+require('dotenv').config();
 
 // Handle login
 async function login(req, res) {
@@ -26,19 +33,21 @@ async function login(req, res) {
 
     const token = jwt.sign(
       { id: user._id, registrationId: user.registrationId, role: user.role },
-      secretKey,
+      secretKey, // Ensure this matches across your app
       { expiresIn: "1h" }
     );
+    
     res.status(200).json({
       success: true,
       message: "Login successful.",
       token: token,
-      user: {
-        registrationId: user.registrationId,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+      role: user.role,
+      // user: {
+      //   registrationId: user.registrationId,
+      //   name: user.name,
+      //   email: user.email,
+      //   role: user.role,
+      // },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: "Internal Server Error" });
@@ -58,6 +67,13 @@ async function createAccount(req, res) {
       });
     }
 
+    const existingUserAccount = await UserCollection.findOne({ registrationId });
+    if (existingUserAccount) {
+      return res.status(400).json({
+        success: false,
+        message: "An account already exists for the provided registration ID.",
+      });
+    }
     // Check in StaffCollection
     let user = await StaffCollection.findOne({ registrationId });
 
@@ -78,7 +94,7 @@ async function createAccount(req, res) {
     const userAccount = {
       registrationId: user.registrationId,
       name: user.name || user.csoName, // Staff uses `name`, CSO uses `csoName`
-      userId: `${user.name}-${Date.now()}` || `{user.csoName}-${Date.now()}`,
+      userId: `${user.name || user.csoName}-${Date.now()}`,
       email: user.email,
       role: user.role || "CSO", // Staff uses `role`, default "CSO" for CSOs
       status: user.status,
@@ -120,4 +136,12 @@ async function getUsersId(req, res) {
   res.send(result);
 }
 
-module.exports = { login, createAccount, getUsers, getUsersId };
+
+async function logout(req, res)  {
+  // Clear the token from the cookies
+  res.clearCookie("token"); 
+  res.clearCookie("user"); // Clear the token from the cookie
+  return res.json({ message: "Successfully logged out" });
+};
+
+module.exports = { login, createAccount, getUsers, getUsersId, logout};
