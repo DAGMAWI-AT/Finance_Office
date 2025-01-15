@@ -1,23 +1,29 @@
-// src/app.js
+//src/app.js
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const jwt = require("jsonwebtoken");
-const { secretKey } = require("./configration/jwtConfig");
+const { secretKey } = require("./configuration/jwtConfig");
 const userRoutes = require("./routes/userRoute");
 const staffRoute = require("./routes/staffRoute");
 const csoRoute = require("./routes/csoRoute");
 const authRoute = require("./routes/authRoute")
-const { connectDB } = require("./configration/db"); // Import the connectDB function
+const { connectDB } = require("./configuration/db");
+const cookieParser = require('cookie-parser');
 
 const port = process.env.PORT || 8000;
 const app = express();
 require("dotenv").config();
+app.use(cookieParser());
 
 // Middleware
 app.use(cors());
+app.use(cors({
+  origin: "http://localhost:3000", // Your frontend URL
+  credentials: true, // Allow cookies to be sent and received
+}));
 app.use(express.json());
 app.get("/", (req, res) => res.send("Hello Dagi!"));
 

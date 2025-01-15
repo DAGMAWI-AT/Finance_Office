@@ -1,15 +1,20 @@
 // src/controllers/userController.js
+const rateLimit = require("express-rate-limit");
 const { UserCollection } = require("../model/user");
 const jwt = require("jsonwebtoken");
-require('dotenv').config();
-
-// const { secretKey } = require("../configration/jwtConfig");
+require("dotenv").config();
 const secretKey = process.env.JWT_secretKey;
 if (!secretKey) {
   throw new Error("JWT_secretKey is not set in the environment variables.");
 }
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-require('dotenv').config();
+
+const loginLimite = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Limit each IP to 10 requests per window
+  message: "Too many login attempts. Please try again later.",
+  statusCode: 429, // Status code for rate limiting
+  headers: true, // Include rate limiting headers in the response
+});
 
 // Handle login
 async function login(req, res) {
@@ -34,20 +39,21 @@ async function login(req, res) {
     const token = jwt.sign(
       { id: user._id, registrationId: user.registrationId, role: user.role },
       secretKey, // Ensure this matches across your app
-      { expiresIn: "1h" }
+      { expiresIn: "1s" }
     );
     
+    // res.cookie("token", token, {
+    //   httpOnly: true,
+    //   secure: process.env.NODE_ENV === "production"  ,    
+    //   sameSite: "strict", // Protect against CSRF
+    //   maxAge: 3600000, // 1 hour
+    // });
     res.status(200).json({
       success: true,
       message: "Login successful.",
       token: token,
       role: user.role,
-      // user: {
-      //   registrationId: user.registrationId,
-      //   name: user.name,
-      //   email: user.email,
-      //   role: user.role,
-      // },
+      // registrationId: user.registrationId
     });
   } catch (error) {
     res.status(500).json({ success: false, message: "Internal Server Error" });
@@ -144,4 +150,4 @@ async function logout(req, res)  {
   return res.json({ message: "Successfully logged out" });
 };
 
-module.exports = { login, createAccount, getUsers, getUsersId, logout};
+module.exports = { login, createAccount, getUsers, getUsersId, logout, loginLimite};
