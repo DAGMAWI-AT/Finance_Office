@@ -21,10 +21,12 @@ app.use(cookieParser());
 
 // Middleware
 app.use(cors());
-app.use(cors({
-  origin: "http://localhost:3000", // Your frontend URL
-  credentials: true, // Allow cookies to be sent and received
-}));
+// app.use(cors({
+//   origin: "http://localhost:3000", // Your frontend URL
+//   credentials: true, // Allow cookies to be sent and received
+// }));
+// app.use(cors({ origin: 'https://csosfinance1.netlify.app', credentials: true }));
+
 app.use(express.json());
 app.get("/", (req, res) => res.send("Hello Dagi!"));
 
