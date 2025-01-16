@@ -10,6 +10,7 @@ const userRoutes = require("./routes/userRoute");
 const staffRoute = require("./routes/staffRoute");
 const csoRoute = require("./routes/csoRoute");
 const authRoute = require("./routes/authRoute")
+const notificationRoute= require("./routes/noificationRoute")
 const { connectDB } = require("./configuration/db");
 const cookieParser = require('cookie-parser');
 
@@ -33,6 +34,7 @@ app.use("/staff", staffRoute)
 app.use("/cso", csoRoute)
 
 app.use("/api/auth", authRoute)
+app.use("/notifications", notificationRoute)
 // MongoDB Setup
 async function run() {
   await connectDB(); // Make sure the DB is connected before starting the server
