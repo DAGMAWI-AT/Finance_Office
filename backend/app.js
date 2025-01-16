@@ -11,6 +11,8 @@ const staffRoute = require("./routes/staffRoute");
 const csoRoute = require("./routes/csoRoute");
 const authRoute = require("./routes/authRoute")
 const notificationRoute= require("./routes/noificationRoute")
+const reportRoute= require("./routes/reportRoute")
+
 const { connectDB } = require("./configuration/db");
 const cookieParser = require('cookie-parser');
 
@@ -28,6 +30,8 @@ app.use(cors());
 // app.use(cors({ origin: 'https://csosfinance1.netlify.app', credentials: true }));
 
 app.use(express.json());
+
+
 app.get("/", (req, res) => res.send("Hello Dagi!"));
 
 // Routes
@@ -37,6 +41,10 @@ app.use("/cso", csoRoute)
 
 app.use("/api/auth", authRoute)
 app.use("/notifications", notificationRoute)
+
+//report route
+
+app.use("/reports", reportRoute)
 // MongoDB Setup
 async function run() {
   await connectDB(); // Make sure the DB is connected before starting the server

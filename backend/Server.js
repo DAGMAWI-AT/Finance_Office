@@ -379,37 +379,7 @@ async function run() {
 
     //
 
-    app.post("/userReports", upload.single("pdfFile"), async (req, res) => {
-      try {
-        if (req.file) {
-          const data = req.body;
-          data.pdfFile = req.file.filename;
 
-          const result = await UserReportsCollection.insertOne(data);
-
-          // Create a notification for admin
-          const notification = {
-            message: "A new report has been submitted.",
-            read: false,
-            timestamp: new Date(),
-          };
-          await NotificationsCollection.insertOne(notification);
-
-          res.json({
-            success: true,
-            message: "Report and notification added successfully.",
-            result,
-          });
-        } else {
-          res.status(400).json({ success: false, message: "No file provided" });
-        }
-      } catch (error) {
-        console.error("Error adding file:", error);
-        res
-          .status(500)
-          .json({ success: false, message: "Internal Server Error" });
-      }
-    });
     app.get("/notifications", async (req, res) => {
       try {
         const notifications = await NotificationsCollection.find().toArray();
@@ -436,6 +406,39 @@ async function run() {
         });
       } catch (error) {
         console.error("Error marking notification as read:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Internal Server Error" });
+      }
+    });
+
+
+    app.post("/userReports", upload.single("pdfFile"), async (req, res) => {
+      try {
+        if (req.file) {
+          const data = req.body;
+          data.pdfFile = req.file.filename;
+
+          const result = await UserReportsCollection.insertOne(data);
+
+          // Create a notification for admin
+          const notification = {
+            message: "A new report has been submitted.",
+            read: false,
+            timestamp: new Date(),
+          };
+          await NotificationsCollection.insertOne(notification);
+
+          res.json({
+            success: true,
+            message: "Report and notification added successfully.",
+            result,
+          });
+        } else {
+          res.status(400).json({ success: false, message: "No file provided" });
+        }
+      } catch (error) {
+        console.error("Error adding file:", error);
         res
           .status(500)
           .json({ success: false, message: "Internal Server Error" });

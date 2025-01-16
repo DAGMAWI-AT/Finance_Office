@@ -1,7 +1,11 @@
+const express = require("express");
+const app = express();
 const multer = require("multer");
 const path = require("path");
-const { StaffCollection } = require("../model/cso"); // Adjust path based on your structure
+const { CSOCollection } = require("../model/cso"); // Adjust path based on your structure
 const { ObjectId } = require("mongodb");
+app.use(express.json());
+app.use("/logos", express.static(path.join(__dirname, "public/logos")));
 
 const storageLogo = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "public/logos"),
@@ -24,7 +28,7 @@ const registerCso = async (req, res) => {
         if (req.file) {
           data.logo = req.file.filename;
 
-          console.log(data);
+          // console.log(data);
           const result = await CSOCollection.insertOne(data);
           res.json({
             success: true,
@@ -58,6 +62,21 @@ const getCsoById = async(req,res)=>{
     const result = await CSOCollection.findOne(filter);
     res.send(result);
 }
+// const getCsoById = async (req, res) => {
+//   const id = req.params.id;
+//   try {
+//     const result = await CSOCollection.findOne({ _id: new ObjectId(id) });
+//     if (result) {
+//       res.json(result);
+//     } else {
+//       res.status(404).json({ success: false, message: "CSO not found" });
+//     }
+//   } catch (error) {
+//     console.error("Error fetching CSO by id:", error);
+//     res.status(500).json({ success: false, message: "Internal Server Error" });
+//   }
+// };
+
 const updateCso= async (req, res) => {
     const id = req.params.id;
     const { status } = req.body;
@@ -78,11 +97,39 @@ const updateCso= async (req, res) => {
         .json({ success: false, message: "Internal Server Error" });
     }
 }
+
+const getCsoByRegistrationId = async (req, res) => {
+  const { registrationId } = req.params;
+
+  try {
+    if (!registrationId) {
+      return res.status(400).json({ success: false, message: "registrationId is required" });
+    }
+
+    const result = await CSOCollection.findOne({ registrationId });
+    if (!result) {
+      return res.status(404).json({ success: false, message: "CSO not found" });
+    }
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Detailed error fetching CSO by registrationId:", error);
+    if (error instanceof MongoError) {
+      res.status(500).json({ success: false, message: "Database error" });
+    } else {
+      res.status(500).json({ success: false, message: "Internal Server Error" });
+    }
+  }
+};
+
+
+
 module.exports = {
     uploadLogo,
     registerCso,
     getCso,
     getCsoById,
-    updateCso
+    updateCso,
+    getCsoByRegistrationId
   };
   

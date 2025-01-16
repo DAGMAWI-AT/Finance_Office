@@ -53,7 +53,7 @@ async function login(req, res) {
       message: "Login successful.",
       token: token,
       role: user.role,
-      // registrationId: user.registrationId
+      registrationId: user.registrationId
     });
   } catch (error) {
     res.status(500).json({ success: false, message: "Internal Server Error" });
