@@ -7,7 +7,7 @@ const router = express.Router();
 
 
 router.post("/login", login);
-router.post("/logout", logout)
+router.post("/logout", logout);
 router.post("/createAccount",verifyToken, authorizeRoles("admin"), createAccount);
 router.get("/users", verifyToken, authorizeRoles("admin"), getUsers);
 router.get("/:id", verifyToken, authorizeRoles("admin"), getUsersId);

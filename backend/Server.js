@@ -7,7 +7,7 @@ const fs = require("fs");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 8000;
 const jwt = require("jsonwebtoken"); // Import jsonwebtoken
-const {secretKey} = require("./configration/jwtConfig"); 
+const { secretKey } = require("./configration/jwtConfig");
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -19,10 +19,10 @@ app.use("/logos", express.static(path.join(__dirname, "public/logos")));
 app.use("/staff", express.static(path.join(__dirname, "public/staff")));
 
 // File Upload Directory
-// const uploadDir = path.join(__dirname, "public/user_report");
-// if (!fs.existsSync(uploadDir)) {
-//   fs.mkdirSync(uploadDir, { recursive: true });
-// }
+const uploadDir = path.join(__dirname, "public/user_report");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 // app.use("/user_report", express.static(uploadDir));
 
 // MongoDB Setup
@@ -46,6 +46,10 @@ const storageReport = multer.diskStorage({
     ),
 });
 const upload = multer({ storage: storageReport });
+
+
+
+
 const storageLogo = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "public/logos"),
   filename: (req, file, cb) =>
@@ -88,7 +92,7 @@ async function run() {
     app.post("/login", async (req, res) => {
       try {
         const { registrationId, password } = req.body;
-    
+
         // Validate input
         if (!registrationId || !password) {
           return res.status(400).json({
@@ -96,7 +100,7 @@ async function run() {
             message: "Registration ID and password are required.",
           });
         }
-    
+
         // Find user in database
         const user = await UserCollection.findOne({ registrationId });
         if (!user) {
@@ -105,7 +109,7 @@ async function run() {
             message: "No user found with the provided registration ID.",
           });
         }
-    
+
         // Validate password (consider using bcrypt for secure password comparison)
         const isPasswordValid = password === user.password; // Replace with bcrypt comparison
         if (!isPasswordValid) {
@@ -114,17 +118,21 @@ async function run() {
             message: "Invalid password. Please try again.",
           });
         }
-    
+
         // Generate JWT token
         const token = jwt.sign(
-          { id: user._id,registrationId:user.registrationId, role: user.role }, // Payload
+          {
+            id: user._id,
+            registrationId: user.registrationId,
+            role: user.role,
+          }, // Payload
           secretKey, // Secret key
           { expiresIn: "1h" } // Token expiration
         );
-      
-    //     const refreshToken = jwt.sign({ id: user._id }, secretKey, { expiresIn: "1h" }); // Longer expiry for refresh token
-    // refreshTokens.push(refreshToken);
-    
+
+        //     const refreshToken = jwt.sign({ id: user._id }, secretKey, { expiresIn: "1h" }); // Longer expiry for refresh token
+        // refreshTokens.push(refreshToken);
+
         // Send token in the response
         res.status(200).json({
           success: true,
@@ -151,72 +159,76 @@ async function run() {
     });
     app.post("/logout", (req, res) => {
       // Clear the token from the cookies
-      res.clearCookie("token"); 
+      res.clearCookie("token");
       res.clearCookie("user"); // Clear the token from the cookie
       return res.json({ message: "Successfully logged out" });
     });
     app.post("/createAccount_users", async (req, res) => {
-  try {
-    const { registrationId, password } = req.body;
+      try {
+        const { registrationId, password } = req.body;
 
-    // Validate input
-    if (!registrationId || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Registration ID and password are required.",
-      });
-    }
-    const existingUserAccount = await UserCollection.findOne({ registrationId });
-    if (existingUserAccount) {
-      return res.status(400).json({
-        success: false,
-        message: "An account already exists for the provided registration ID.",
-      });
-    }
-    // Check in StaffCollection
-    let user = await StaffCollection.findOne({ registrationId });
+        // Validate input
+        if (!registrationId || !password) {
+          return res.status(400).json({
+            success: false,
+            message: "Registration ID and password are required.",
+          });
+        }
+        const existingUserAccount = await UserCollection.findOne({
+          registrationId,
+        });
+        if (existingUserAccount) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "An account already exists for the provided registration ID.",
+          });
+        }
+        // Check in StaffCollection
+        let user = await StaffCollection.findOne({ registrationId });
 
-    // If not found, check in CSOCollection
-    if (!user) {
-      user = await CSOCollection.findOne({ registrationId });
-    }
+        // If not found, check in CSOCollection
+        if (!user) {
+          user = await CSOCollection.findOne({ registrationId });
+        }
 
-    // If no matching record found
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "No record found for the provided registration ID.",
-      });
-    }
+        // If no matching record found
+        if (!user) {
+          return res.status(404).json({
+            success: false,
+            message: "No record found for the provided registration ID.",
+          });
+        }
 
-    // Prepare user account data
-    const userAccount = {
-      registrationId: user.registrationId,
-      name: user.name || user.csoName,      // Staff uses `name`, CSO uses `csoName`
-      userId : `${user.name}-${Date.now()}`||`${user.csoName}-${Date.now()}`,
-      email: user.email,
-      role: user.role || "CSO", // Staff uses `role`, default "CSO" for CSOs
-      status: user.status,
-      password, // Store a hashed version of the password in production
-      createdAt: new Date(),
-    };
+        // Prepare user account data
+        const userAccount = {
+          registrationId: user.registrationId,
+          name: user.name || user.csoName, // Staff uses `name`, CSO uses `csoName`
+          userId:
+            `${user.name}-${Date.now()}` || `${user.csoName}-${Date.now()}`,
+          email: user.email,
+          role: user.role || "CSO", // Staff uses `role`, default "CSO" for CSOs
+          status: user.status,
+          password, // Store a hashed version of the password in production
+          createdAt: new Date(),
+        };
 
-    // Insert user account
-    const result = await UserCollection.insertOne(userAccount);
+        // Insert user account
+        const result = await UserCollection.insertOne(userAccount);
 
-    res.json({
-      success: true,
-      message: "User account created successfully.",
-      result,
+        res.json({
+          success: true,
+          message: "User account created successfully.",
+          result,
+        });
+      } catch (error) {
+        console.error("Error creating user account:", error);
+        res.status(500).json({
+          success: false,
+          message: "Internal Server Error",
+        });
+      }
     });
-  } catch (error) {
-    console.error("Error creating user account:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal Server Error",
-    });
-  }
-});
 
     app.get("/users", async (req, res) => {
       try {
@@ -236,7 +248,9 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/registerStaff", uploadStaffPhoto.single("photo"),
+    app.post(
+      "/registerStaff",
+      uploadStaffPhoto.single("photo"),
       async (req, res) => {
         try {
           const data = req.body;
@@ -282,8 +296,6 @@ async function run() {
       const result = await StaffCollection.findOne(filter);
       res.send(result);
     });
-
-
 
     // Route: Register CSO
 
@@ -376,9 +388,7 @@ async function run() {
       }
     });
 
-
     //
-
 
     app.get("/notifications", async (req, res) => {
       try {
@@ -411,7 +421,6 @@ async function run() {
           .json({ success: false, message: "Internal Server Error" });
       }
     });
-
 
     app.post("/userReports", upload.single("pdfFile"), async (req, res) => {
       try {

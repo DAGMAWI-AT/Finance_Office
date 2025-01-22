@@ -1,9 +1,14 @@
+const express = require("express");
 const multer = require("multer");
 const path = require("path");
-const { StaffCollection } = require("../model/staff"); // Adjust path based on your structure
+const app = express();
+const { StaffCollection } = require("../model/staff");
 const { ObjectId } = require("mongodb");
+app.use(express.json());
 
-// Configure multer for file storage
+require("dotenv").config();
+app.use("/staff", express.static(path.join(__dirname, "public/staff")));
+
 const storageStaffPhoto = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "public/staff"), // Directory where photo will be stored
   filename: (req, file, cb) =>
@@ -61,10 +66,43 @@ const getStaffById = async (req, res) => {
   const result = await StaffCollection.findOne(filter);
   res.send(result);
 };
-// Export the function and multer middleware
+
+const getStaffByRegistrationId = async (req, res) => {
+  const { registrationId } = req.params;
+
+  try {
+    if (!registrationId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "registrationId is required" });
+    }
+
+    const result = await StaffCollection.findOne({ registrationId });
+    if (!result) {
+      return res
+        .status(404)
+        .json({ success: false, message: "staff user not found" });
+    }
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error(
+      "Detailed error fetching staff user by registrationId:",
+      error
+    );
+    if (error instanceof MongoError) {
+      res.status(500).json({ success: false, message: "Database error" });
+    } else {
+      res
+        .status(500)
+        .json({ success: false, message: "Internal Server Error" });
+    }
+  }
+};
 module.exports = {
   uploadStaffPhoto,
   registerStaff,
   getStaff,
   getStaffById,
+  getStaffByRegistrationId,
 };

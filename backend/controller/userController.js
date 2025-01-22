@@ -1,8 +1,13 @@
 // src/controllers/userController.js
 const rateLimit = require("express-rate-limit");
 const { UserCollection } = require("../model/user");
-const jwt = require("jsonwebtoken");
+const { StaffCollection } = require("../model/staff");
+const { CSOCollection } = require("../model/cso");
+
+
 require("dotenv").config();
+
+const jwt = require("jsonwebtoken");
 const secretKey = process.env.JWT_secretKey;
 if (!secretKey) {
   throw new Error("JWT_secretKey is not set in the environment variables.");
@@ -39,12 +44,12 @@ async function login(req, res) {
     const token = jwt.sign(
       { id: user._id, registrationId: user.registrationId, role: user.role },
       secretKey, // Ensure this matches across your app
-      { expiresIn: "1s" }
+      { expiresIn: "1h" }
     );
-    
+
     // res.cookie("token", token, {
     //   httpOnly: true,
-    //   secure: process.env.NODE_ENV === "production"  ,    
+    //   secure: process.env.NODE_ENV === "production"  ,
     //   sameSite: "strict", // Protect against CSRF
     //   maxAge: 3600000, // 1 hour
     // });
@@ -53,7 +58,7 @@ async function login(req, res) {
       message: "Login successful.",
       token: token,
       role: user.role,
-      registrationId: user.registrationId
+      registrationId: user.registrationId,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: "Internal Server Error" });
@@ -73,7 +78,9 @@ async function createAccount(req, res) {
       });
     }
 
-    const existingUserAccount = await UserCollection.findOne({ registrationId });
+    const existingUserAccount = await UserCollection.findOne({
+      registrationId,
+    });
     if (existingUserAccount) {
       return res.status(400).json({
         success: false,
@@ -142,12 +149,19 @@ async function getUsersId(req, res) {
   res.send(result);
 }
 
-
-async function logout(req, res)  {
+async function logout(req, res) {
   // Clear the token from the cookies
-  res.clearCookie("token"); 
-  res.clearCookie("user"); // Clear the token from the cookie
+  res.clearCookie("token");
+  res.clearCookie("user");
+  res.removeLocalstorage("token") // Clear the token from the cookie
   return res.json({ message: "Successfully logged out" });
-};
+}
 
-module.exports = { login, createAccount, getUsers, getUsersId, logout, loginLimite};
+module.exports = {
+  login,
+  createAccount,
+  getUsers,
+  getUsersId,
+  logout,
+  loginLimite,
+};
