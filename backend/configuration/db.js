@@ -2,8 +2,8 @@
 const { MongoClient, ServerApiVersion } = require("mongodb");
 
 // MongoDB URI
-const uri =
-  "mongodb+srv://finance:finance_offices@cluster0.ixomm.mongodb.net/?retryWrites=true&w=majority";
+const uri ="mongodb://mongo:eClBfDndnuCOAmSUdIJbvwdPkvhoEQlv@mongodb.railway.internal:27017";
+  //"mongodb+srv://finance:finance_offices@cluster0.ixomm.mongodb.net/?retryWrites=true&w=majority";
 
 // Create MongoClient instance
 const client = new MongoClient(uri, {
