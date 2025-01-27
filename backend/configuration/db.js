@@ -1,14 +1,27 @@
-require('dotenv').config();
-const { MongoClient } = require("mongodb");
+// src/config/db.js
+const { MongoClient, ServerApiVersion } = require("mongodb");
 
-const uri = process.env.MONGO_URL;
-console.log("MongoDB URI:", uri);
+// MongoDB URI
+const uri =
+  "mongodb+srv://finance:finance_offices@cluster0.ixomm.mongodb.net/?retryWrites=true&w=majority";
+  
+  // const uri = "mongodb://localhost:27017/finance_office";
 
-const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+// Create MongoClient instance
+const client = new MongoClient(uri, {
+  serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
+});
 
-client.connect()
-  .then(() => console.log("Connected to MongoDB"))
-  .catch(err => console.error("Failed to connect to MongoDB:", err));
+// Connect to MongoDB
+async function connectDB() {
+  try {
+    await client.connect();
+    console.log("MongoDB connected successfully");
+  } catch (err) {
+    console.error("MongoDB connection failed:", err);
+    process.exit(1); // Exit the process if the connection fails
+  }
+}
 
 // Export the client and connect function
 module.exports = { client, connectDB };
