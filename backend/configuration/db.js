@@ -24,3 +24,7 @@ async function connectDB() {
 
 // Export the client and connect function
 module.exports = { client, connectDB };
+
+
+// Export the client and connect function
+module.exports = { client, connectDB };
