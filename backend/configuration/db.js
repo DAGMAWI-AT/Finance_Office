@@ -2,7 +2,7 @@
 const { MongoClient, ServerApiVersion } = require("mongodb");
 
 // MongoDB URI
-const uri ="mongodb://mongo:eClBfDndnuCOAmSUdIJbvwdPkvhoEQlv@mongodb.railway.internal:27017";
+const uri ="mongodb://${{procces.env.MONGO_INITDB_ROOT_USERNAME}}:${{procces.env.MONGO_INITDB_ROOT_PASSWORD}}@${{procces.env.RAILWAY_TCP_PROXY_DOMAIN}}:${{procces.env.RAILWAY_TCP_PROXY_PORT}}";
   //"mongodb+srv://finance:finance_offices@cluster0.ixomm.mongodb.net/?retryWrites=true&w=majority";
 
 // Create MongoClient instance
