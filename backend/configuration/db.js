@@ -3,7 +3,7 @@ require("dotenv").config();
 const { MongoClient, ServerApiVersion } = require("mongodb");
 
 // MongoDB URI
-const uri ="mongodb://${{procces.env.MONGO_INITDB_ROOT_USERNAME}}:${{procces.env.MONGO_INITDB_ROOT_PASSWORD}}@${{procces.env.RAILWAY_TCP_PROXY_DOMAIN}}:${{procces.env.RAILWAY_TCP_PROXY_PORT}}";
+const uri ="mongodb://${{process.env.MONGO_INITDB_ROOT_USERNAME}}:${{process.env.MONGO_INITDB_ROOT_PASSWORD}}@${{process.env.RAILWAY_TCP_PROXY_DOMAIN}}:${{process.env.RAILWAY_TCP_PROXY_PORT}}";
   //"mongodb+srv://finance:finance_offices@cluster0.ixomm.mongodb.net/?retryWrites=true&w=majority";
 
 // Create MongoClient instance
