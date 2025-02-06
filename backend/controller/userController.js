@@ -153,7 +153,6 @@ async function logout(req, res) {
   // Clear the token from the cookies
   res.clearCookie("token");
   res.clearCookie("user");
-  res.removeLocalstorage("token") // Clear the token from the cookie
   return res.json({ message: "Successfully logged out" });
 }
 

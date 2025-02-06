@@ -13,6 +13,7 @@ const authRoute = require("./routes/authRoute");
 const notificationRoute = require("./routes/noificationRoute");
 const reportRoute = require("./routes/reportRoute");
 const reportCategoryRoute = require("./routes/reportCategoryRoute")
+const commentRoute = require("./routes/commentRoute");
 const { connectDB } = require("./configuration/db");
 const cookieParser = require("cookie-parser");
 const port = process.env.PORT || 8000;
@@ -21,6 +22,7 @@ require("dotenv").config();
 app.use(cookieParser());
 app.use(express.json());
 app.use(cors());
+
 app.use("/staff", express.static(path.join(__dirname, "public/staff")));
 app.use("/logos", express.static(path.join(__dirname, "public/logos")));
 
@@ -28,13 +30,18 @@ app.use(
   "/user_report",
   express.static(path.join(__dirname, "public/user_report"))
 );
-
+app.use(
+    "/comment",
+    express.static(path.join(__dirname, "public/comment"))
+  );
 // Middleware
 // app.use(cors({
 //   origin: "http://localhost:3000", // Your frontend URL
 //   credentials: true, // Allow cookies to be sent and received
 // }));
 // app.use(cors({ origin: 'https://csosfinance1.netlify.app', credentials: true }));
+// app.use(cors({ origin: 'http://localhost:8000', credentials: true }));
+
 
 // Routes
 app.use("/user", userRoutes);
@@ -46,6 +53,8 @@ app.use("/notifications", notificationRoute);
 //report route
 app.use("/reports", reportRoute);
 app.use("/reportCategory", reportCategoryRoute)
+
+app.use("/comment", commentRoute)
 
 
 

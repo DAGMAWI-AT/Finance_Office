@@ -1,12 +1,13 @@
 // src/routes/csoRoutes.js
 const express = require("express");
-const { uploadLogo, registerCso, getCso, getCsoById, updateCso, getCsoByRegistrationId } = require("../controller/csoController");
+const {uploadLicense, uploadLogo, registerCso, getCso, getCsoById, updateCso, getCsoByRegistrationId } = require("../controller/csoController");
 const app = express();
 const path = require("path");
 const cors = require("cors");
 app.use(cors());
 const router = express.Router();
 app.use("/logos", express.static(path.join(__dirname, "public/logos")));
+app.use("/licenses", express.static(path.join(__dirname, "public/licenses")));
 
 router.post("/register", uploadLogo.single("logo"), registerCso);
 router.get("/get",getCso);

@@ -29,7 +29,31 @@ const patchNotificationsById = async (req, res) => {
   }
 };
 
+const getNotificationsByRegistrationId = async (req, res) => {
+  try {
+    const { registrationId } = req.params;
+    const notifications = await NotificationsCollection.find({ registrationId }).toArray();
+    res.json(notifications);
+} catch (error) {
+    console.error("Error fetching notifications:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error." });
+}
+};
+
+const getNotificationsByReportId = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+    const report = await ReportsCollection.findOne({ _id: new ObjectId(reportId) });
+    res.json(report);
+} catch (error) {
+    console.error("Error fetching report details:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error." });
+}
+};
+
 module.exports = {
   getNotifications,
   patchNotificationsById,
+  getNotificationsByRegistrationId,
+  getNotificationsByReportId,
 };

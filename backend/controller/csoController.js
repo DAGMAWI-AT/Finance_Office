@@ -1,3 +1,4 @@
+// controller/csoController
 const express = require("express");
 const app = express();
 const multer = require("multer");
@@ -8,33 +9,33 @@ app.use(express.json());
 
 
 
-app.use("/logos", express.static(path.join(__dirname, "public/logos")));
 app.use("/licenses", express.static(path.join(__dirname, "public/licenses")));
 
-// Multer storage for logo
-const storageLogo = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "public/logos"),
-  filename: (req, file, cb) =>
-    cb(null, file.fieldname + "_" + Date.now() + path.extname(file.originalname)),
-});
-
-// Multer storage for licenses
 const storageLicense = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "public/licenses"),
   filename: (req, file, cb) =>
-    cb(null, file.fieldname + "_" + Date.now() + path.extname(file.originalname)),
+    cb(
+      null,
+      // "logo_" + Date.now() + path.extname(file.originalname)
+      file.fieldname + "_" + Date.now() + path.extname(file.originalname)
+    ),
 });
 
-// Multer upload configuration
-const upload = multer({
-  storage: multer.diskStorage({}),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit per file
-});
+const uploadLicense = multer({ storage: storageLicense });
 
-const uploadFiles = upload.fields([
-  { name: "logo", maxCount: 1 },
-  { name: "licenses", maxCount: 10 },
-]);
+
+app.use("/logos", express.static(path.join(__dirname, "public/logos")));
+
+const storageLogo = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, "public/logos"),
+  filename: (req, file, cb) =>
+    cb(
+      null,
+      // "logo_" + Date.now() + path.extname(file.originalname)
+      file.fieldname + "_" + Date.now() + path.extname(file.originalname)
+    ),
+});
+const uploadLogo = multer({ storage: storageLogo });
 
 const registerCso = async (req, res) => {
   try {
@@ -42,17 +43,9 @@ const registerCso = async (req, res) => {
     data.registrationId = `CSO-${Date.now()}`;
     data.status = "active";
     data.date = new Date();
-
-    if (req.files) {
-      // Handle logo
-      if (req.files.logo) {
-        data.logo = req.files.logo[0].filename;
-      }
-
-      // Handle license files
-      if (req.files.licenses) {
-        data.licenses = req.files.licenses.map((file) => file.filename);
-      }
+    if (req.file) {
+      data.logo = req.file.filename;
+      // data.licenses = req.file.filename;
 
       const { email, phone } = data;
 
@@ -69,77 +62,21 @@ const registerCso = async (req, res) => {
         });
       }
 
-      // Insert CSO data into the database
+      // console.log(data);
       const result = await CSOCollection.insertOne(data);
-
       res.json({
         success: true,
         message: "CSO registered successfully.",
         result,
       });
     } else {
-      res.status(400).json({ success: false, message: "No files uploaded" });
+      res.status(400).json({ success: false, message: "No file uploaded" });
     }
   } catch (error) {
     console.error("Error registering CSO:", error);
     res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
-
-
-
-// app.use("/logos", express.static(path.join(__dirname, "public/logos")));
-
-// const storageLogo = multer.diskStorage({
-//   destination: (req, file, cb) => cb(null, "public/logos"),
-//   filename: (req, file, cb) =>
-//     cb(
-//       null,
-//       // "logo_" + Date.now() + path.extname(file.originalname)
-//       file.fieldname + "_" + Date.now() + path.extname(file.originalname)
-//     ),
-// });
-const uploadLogo = multer({ storage: storageLogo });
-
-// const registerCso = async (req, res) => {
-//   try {
-//     const data = req.body;
-//     data.registrationId = `CSO-${Date.now()}`;
-//     data.status = "active";
-//     data.date = new Date();
-//     if (req.file) {
-//       data.logo = req.file.filename;
-      
-//       const { email, phone } = data;
-
-//       // Check if email or phone already exists
-//       const existingUserInformation = await CSOCollection.findOne({
-//         $or: [{ email }, { phone }],
-//       });
-
-//       if (existingUserInformation) {
-//         console.log("An account already exists for the provided email or phone.");
-//         return res.status(400).json({
-//           success: false,
-//           message: "An account already exists for the provided email or phone.",
-//         });
-//       }
-
-//       // console.log(data);
-//       const result = await CSOCollection.insertOne(data);
-//       res.json({
-//         success: true,
-//         message: "CSO registered successfully.",
-//         result,
-//       });
-//     } else {
-//       res.status(400).json({ success: false, message: "No file uploaded" });
-//     }
-//   } catch (error) {
-//     console.error("Error registering CSO:", error);
-//     res.status(500).json({ success: false, message: "Internal Server Error" });
-//   }
-// };
 const getCso = async (req, res) => {
   try {
     const csos = await CSOCollection.find().toArray();
@@ -219,6 +156,7 @@ const getCsoByRegistrationId = async (req, res) => {
 
 module.exports = {
   uploadLogo,
+  uploadLicense,
   registerCso,
   getCso,
   getCsoById,
