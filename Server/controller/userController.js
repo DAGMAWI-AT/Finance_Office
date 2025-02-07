@@ -229,6 +229,61 @@ const deleteUser = async (req, res) => {
 };
 
 
+async function updatePassword(req, res) {
+  try {
+    const userId = req.user.id; // From JWT middleware
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Current and new password are required",
+      });
+    }
+
+    // Fetch user from database
+    const [rows] = await pool.query(`SELECT * FROM users WHERE id = ?`, [userId]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "User not found" 
+      });
+    }
+
+    const user = rows[0]; // Get user data
+
+    // Skip password hashing (direct comparison)
+    if (currentPassword !== user.password) {
+      return res.status(401).json({ 
+        success: false, 
+        message: "Current password is incorrect" 
+      });
+    }
+
+    // Directly update the password (no hashing)
+    await pool.query(
+      `UPDATE users SET password = ? WHERE id = ?`,
+      [newPassword, userId]
+    );
+
+    res.json({ 
+      success: true, 
+      message: "Password updated successfully" 
+    });
+
+  } catch (error) {
+    console.error("Password update error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Internal server error" 
+    });
+  }
+}
+
+
+
+
 
 // Handle logout
 async function logout(req, res) {
@@ -237,6 +292,72 @@ async function logout(req, res) {
   return res.json({ message: "Successfully logged out" });
 }
 
+
+
+
+const generateResetToken = (userId) => {
+  return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "1h" });
+};
+
+// Forgot Password - Send Reset Email
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Check if user exists
+    const [rows] = await pool.query(`SELECT id FROM users WHERE email = ?`, [email]);
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Email not found" });
+    }
+
+    const userId = rows[0].id;
+    const token = generateResetToken(userId);
+    const resetLink = `${process.env.FRONTEND_URL}/reset-password/${token}`;
+
+    // Send Email
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Password Reset",
+      html: `<p>Click <a href="${resetLink}">here</a> to reset your password. Link expires in 1 hour.</p>`,
+    });
+
+    res.json({ success: true, message: "Reset link sent to your email." });
+
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// Reset Password - Update Password
+const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    // Verify Token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+
+    // Update Password in Database (Without Hashing)
+    await pool.query(`UPDATE users SET password = ? WHERE id = ?`, [newPassword, userId]);
+
+    res.json({ success: true, message: "Password updated successfully." });
+
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(400).json({ success: false, message: "Invalid or expired token." });
+  }
+};
 module.exports = {
   login,
   createAccount,
@@ -244,6 +365,9 @@ module.exports = {
   getUsersId,
   updateUser,
   deleteUser,
+  updatePassword,
   logout,
   loginLimite,
+  resetPassword,
+  forgotPassword,
 };
