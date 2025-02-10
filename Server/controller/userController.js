@@ -7,12 +7,23 @@ const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const {createCsoTable, csoTable } = require("../model/cso");
 const {createStaffTable, staffTable } = require("../model/staff");
+const nodemailer = require('nodemailer');
 
 const secretKey = process.env.JWT_secretKey;
-if (!secretKey) {
-  throw new Error("JWT_secretKey is not set in the environment variables.");
+// if (!secretKey) {
+//   throw new Error("JWT_secretKey is not set in the environment variables.");
+// }
+// const jwt = require('jsonwebtoken');
+// require('dotenv').config();
+
+const restKey = process.env.JWT_SECRET;
+if (!restKey) {
+  throw new Error("JWT_SECRET is not set in the environment variables.");
 }
 
+const generateResetToken = (userId) => {
+  return jwt.sign({ id: userId }, restKey, { expiresIn: "1h" });
+};
 const loginLimite = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // Limit each IP to 10 requests per window
@@ -295,11 +306,10 @@ async function logout(req, res) {
 
 
 
-const generateResetToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "1h" });
-};
+// const generateResetToken = (userId) => {
+//   return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "1h" });
+// };
 
-// Forgot Password - Send Reset Email
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -338,14 +348,13 @@ const forgotPassword = async (req, res) => {
   }
 };
 
-// Reset Password - Update Password
 const resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
     const { newPassword } = req.body;
 
     // Verify Token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, secretKey);
     const userId = decoded.id;
 
     // Update Password in Database (Without Hashing)

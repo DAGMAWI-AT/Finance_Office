@@ -121,7 +121,28 @@ const updateStaff = async (req, res) => {
       if (staff.length === 0) {
         return res.status(404).json({ success: false, message: "Staff not found" });
       }
-      updateData.updated_at = new Date(); // Automatically set updated time
+      updateData.updated_at = new Date();
+      
+      if (req.file) {
+        // Save the new file to the user_report folder
+        updateData.photo = req.file.filename;
+  
+        // Delete the old file if it exists
+        const [oldStaffPhoto] = await pool.execute(
+          `SELECT photo FROM ${staffTable} WHERE id = ?`,
+          [id]
+        );
+        if (oldStaffPhoto.length > 0 && oldStaffPhoto[0].photo) {
+          const oldFilePath = path.join(
+            __dirname,
+            "../public/staff",
+            oldStaffPhoto[0].photo
+          );
+          if (fs.existsSync(oldFilePath)) {
+            fs.unlinkSync(oldFilePath); // Delete the old file
+          }
+        }
+      }// Automatically set updated time
       // Construct dynamic query
       if (updateData.created_at) {
         delete updateData.created_at; // Prevent modifying `created_at`

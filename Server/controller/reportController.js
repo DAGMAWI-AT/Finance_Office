@@ -106,7 +106,7 @@ const getUserReport = async (req, res) => {
     // const connection = await pool.getConnection();
     const [rows] = await pool.execute(`SELECT * FROM ${reportTable} ORDER BY created_at DESC`);
     // pool.release();
-    res.json({ success: true, data: rows });
+    res.json(rows);
   } catch (error) {
     console.error("Error fetching reports:", error);
     res.status(500).json({ success: false, message: "Internal Server Error" });

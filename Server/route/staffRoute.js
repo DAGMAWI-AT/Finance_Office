@@ -26,7 +26,7 @@ router.post("/register", uploadStaffPhoto.single("photo"), registerStaff);
 router.get("/", getStaff);
 router.get("/:id", getStaffById);
 router.get("/byId/:registrationId", getStaffByRegistrationId);
-router.patch("/update/:id", updateStaff);
+router.patch("/update/:id",uploadStaffPhoto.single("photo"), updateStaff);
 // router.put("/update/:registrationId", updateStaffByRegistrationId);
 
 router.delete("/:id", uploadStaffPhoto.single("photo"), deleteStaff);

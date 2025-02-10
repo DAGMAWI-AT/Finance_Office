@@ -50,7 +50,7 @@ const getReportsCategory = async (req, res) => {
     // const [result] = await pool.execute(
     //   `SELECT * FROM ${reportCategoryTable} WHERE expire_date IS NULL OR expire_date > NOW() ORDER BY created_at DESC`
     // );
-    const [result] = await pool.query(`SELECT * FROM ${reportCategoryTable}`);
+    const [result] = await pool.execute(`SELECT * FROM ${reportCategoryTable}`);
 
     res.json(result);
   } catch (error) {
