@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { pool } = require("../config/db");
 
-const getReportDasbord = async (req, res) => {
+const getReportDashboard = async (req, res) => {
   try {
     // Fetch data from the database
     const [users] = await pool.query("SELECT COUNT(*) as count FROM users");
@@ -37,4 +37,4 @@ const getReportDasbord = async (req, res) => {
   }
 };
 
-module.exports = {getReportDasbord};
+module.exports = {getReportDashboard};

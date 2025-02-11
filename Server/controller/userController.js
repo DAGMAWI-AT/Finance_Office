@@ -45,7 +45,12 @@ async function login(req, res) {
         message: "No user found with the provided registration ID or Email.",
       });
     }
-
+    if (user[0].status !== "active") {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is inactive. Please contact support.",
+      });
+    }
     const isPasswordValid = password === user[0].password;
     if (!isPasswordValid) {
       return res.status(401).json({
@@ -207,8 +212,11 @@ const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const data = req.body;
-    data.updated_at = new Date(); // Automatically set updated time
+    data.updated_at = new Date(); 
 
+    if (data.createdAt) {
+      delete data.createdAt; 
+      }
     const [result] = await pool.query(`UPDATE ${usersTable} SET ? WHERE id = ?`, [data, id]);
 
     if (result.affectedRows === 0) {

@@ -126,20 +126,20 @@ const updateCso = async (req, res) => {
     let updateData = req.body;
   
     try {
-      const [existingCso] = await pool.query(`SELECT logo FROM ${csoTable} WHERE id = ?`, [id]);
+      const [existingCso] = await pool.query(`SELECT logo, tin_certificate, registration_certificate FROM ${csoTable} WHERE id = ?`, [id]);
   
       if (existingCso.length === 0) {
         return res.status(404).json({ success: false, message: "CSO not found" });
       }
+      const uploadsDir = path.join(__dirname, "..", "public", "cso_files");
+
+
+      const deleteOldFile = async (filePath) => {
+        if (filePath) {
+          // Extract the filename from the database path
+          const filename = path.basename(filePath);
+          const oldFilePath = path.join(uploadsDir, filename);
   
-      // If there is a new logo file uploaded, handle it
-      if (req.files && req.files["logo"]) {
-        const uploadsDir = path.join(__dirname, "..", "public", "cso_files");
-  
-        // Only delete the old file if it exists and the logo is updated
-        if (existingCso[0].logo) {
-          const oldFilePath = path.join(uploadsDir, path.basename(existingCso[0].logo));
-          
           try {
             // Check if the file exists before deleting
             await fs.promises.access(oldFilePath);
@@ -150,13 +150,24 @@ const updateCso = async (req, res) => {
             }
           }
         }
-  
-        // Update the new logo path in the database
+      };
+      if (req.files && req.files["logo"]) {
+        await deleteOldFile(existingCso[0].logo);
         updateData.logo = baseURL + req.files["logo"][0].filename;
       }
+      if (req.files && req.files["tin_certificate"]) {
+        await deleteOldFile(existingCso[0].tin_certificate); 
+        updateData.tin_certificate = baseURL + req.files["tin_certificate"][0].filename; 
+      }
   
+      if (req.files && req.files["registration_certificate"]) {
+        await deleteOldFile(existingCso[0].registration_certificate); 
+        updateData.registration_certificate = baseURL + req.files["registration_certificate"][0].filename;
+      }
       updateData.updated_at = new Date();
-  
+      if (updateData.date) {
+        delete updateData.date; 
+        }
       // Build the query for the fields that need to be updated
       const fields = Object.keys(updateData).map(field => `${field} = ?`).join(", ");
       const values = Object.values(updateData);
