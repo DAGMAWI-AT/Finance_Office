@@ -15,7 +15,7 @@ router.post("/upload", postReportCategory);
 router.get("/", getReportCategory);
 router.get("/cat", getReportsCategory);
 router.get("/:id", getReportCategoryById);
-router.put("/:id", verifyToken, authorizeRoles(["admin"]), updateReportCategory);
+router.put("/:id", updateReportCategory);
 router.delete("/:id", verifyToken, authorizeRoles(["admin"]), deleteReportCategory);
 
 module.exports = router;

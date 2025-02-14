@@ -5,6 +5,7 @@ const csoRoute = require("./route/csoRoute");
 const staffRoute = require("./route/staffRoute");
 const reportRout = require("./route/reportRoute")
 const commentRoute = require("./route/commentRoute");
+const beneficiaryRoute = require('./route/beneficiaryRoute');
 const reportCategoryRoute = require("./route/reportCategoryRoute")
 const notificationRoute = require("./route/notificationRoute");
 const { pool, connectDB } = require('./config/db'); 
@@ -18,6 +19,8 @@ app.use("/comment", express.static("public/comment"));
 
 app.use("/uploads", express.static("public/cso_files"));
 app.use("/user_report", express.static(path.join(__dirname, "public/user_report")));
+app.use("/idFiles", express.static(path.join(__dirname, "public/idFiles")));
+app.use('/photoFiles', express.static(path.join(__dirname, 'public/photoFiles')));
 app.use("/user_report", express.static("public/user_report"));
 app.use("/uploads", express.static("public/cso_files"));
 app.use("/staff", express.static(path.join(__dirname, "public/staff")));
@@ -32,6 +35,7 @@ app.use("/api/reportCategory", reportCategoryRoute);
 app.use("/api/comments", commentRoute);
 app.use("/api/notifications", notificationRoute);
 
+app.use('/api', beneficiaryRoute);
 
 
 const PORT = process.env.PORT || 5000;

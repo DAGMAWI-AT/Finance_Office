@@ -1,13 +1,11 @@
-
-
 const rateLimit = require("express-rate-limit");
 const { pool } = require("../config/db");
 const { createUserTable, usersTable } = require("../model/user");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
-const {createCsoTable, csoTable } = require("../model/cso");
-const {createStaffTable, staffTable } = require("../model/staff");
-const nodemailer = require('nodemailer');
+const { createCsoTable, csoTable } = require("../model/cso");
+const { createStaffTable, staffTable } = require("../model/staff");
+const nodemailer = require("nodemailer");
 
 const secretKey = process.env.JWT_secretKey;
 // if (!secretKey) {
@@ -37,7 +35,10 @@ async function login(req, res) {
     const { registrationId, email, password } = req.body;
 
     // Find user by registrationId
-    const [user] = await pool.query(`SELECT * FROM ${usersTable} WHERE registrationId = ? AND email = ?`, [registrationId, email]);
+    const [user] = await pool.query(
+      `SELECT * FROM ${usersTable} WHERE registrationId = ? AND email = ?`,
+      [registrationId, email]
+    );
 
     if (user.length === 0) {
       return res.status(404).json({
@@ -61,7 +62,11 @@ async function login(req, res) {
 
     // Generate JWT token
     const token = jwt.sign(
-      { id: user[0].id, registrationId: user[0].registrationId, role: user[0].role },
+      {
+        id: user[0].id,
+        registrationId: user[0].registrationId,
+        role: user[0].role,
+      },
       secretKey,
       { expiresIn: "1h" }
     );
@@ -100,7 +105,6 @@ async function createAccount(req, res) {
       [registrationId]
     );
 
-
     // Check if the registrationId exists in csoTable
     const [csoRecord] = await pool.query(
       `SELECT * FROM ${csoTable} WHERE registrationId = ?`,
@@ -120,7 +124,8 @@ async function createAccount(req, res) {
     if (csoRecord.length === 0 && staffRecord.length === 0) {
       return res.status(404).json({
         success: false,
-        message: "No record found in both CSO and Staff tables for the provided registration ID.",
+        message:
+          "No record found in both CSO and Staff tables for the provided registration ID.",
       });
     }
 
@@ -183,8 +188,6 @@ async function createAccount(req, res) {
   }
 }
 
-
-
 // Get all users
 async function getUsers(req, res) {
   try {
@@ -199,9 +202,14 @@ async function getUsers(req, res) {
 async function getUsersId(req, res) {
   try {
     const id = req.params.id;
-    const [user] = await pool.query(`SELECT * FROM ${usersTable} WHERE id = ?`, [id]);
+    const [user] = await pool.query(
+      `SELECT * FROM ${usersTable} WHERE id = ?`,
+      [id]
+    );
     if (user.length === 0) {
-      return res.status(404).json({ success: false, message: "User not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
     }
     res.json(user[0]);
   } catch (error) {
@@ -212,15 +220,20 @@ const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const data = req.body;
-    data.updated_at = new Date(); 
+    data.updated_at = new Date();
 
     if (data.createdAt) {
-      delete data.createdAt; 
-      }
-    const [result] = await pool.query(`UPDATE ${usersTable} SET ? WHERE id = ?`, [data, id]);
+      delete data.createdAt;
+    }
+    const [result] = await pool.query(
+      `UPDATE ${usersTable} SET ? WHERE id = ?`,
+      [data, id]
+    );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, message: "User not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
     }
 
     res.json({ success: true, message: "User updated successfully." });
@@ -234,10 +247,15 @@ const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [result] = await pool.query(`DELETE FROM ${usersTable} WHERE id = ?`, [id]);
+    const [result] = await pool.query(
+      `DELETE FROM ${usersTable} WHERE id = ?`,
+      [id]
+    );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, message: "User not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
     }
 
     res.json({ success: true, message: "User deleted successfully." });
@@ -246,7 +264,6 @@ const deleteUser = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
-
 
 async function updatePassword(req, res) {
   try {
@@ -261,12 +278,14 @@ async function updatePassword(req, res) {
     }
 
     // Fetch user from database
-    const [rows] = await pool.query(`SELECT * FROM users WHERE id = ?`, [userId]);
-    
+    const [rows] = await pool.query(`SELECT * FROM users WHERE id = ?`, [
+      userId,
+    ]);
+
     if (rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "User not found" 
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
       });
     }
 
@@ -274,35 +293,30 @@ async function updatePassword(req, res) {
 
     // Skip password hashing (direct comparison)
     if (currentPassword !== user.password) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "Current password is incorrect" 
+      return res.status(401).json({
+        success: false,
+        message: "Current password is incorrect",
       });
     }
 
     // Directly update the password (no hashing)
-    await pool.query(
-      `UPDATE users SET password = ? WHERE id = ?`,
-      [newPassword, userId]
-    );
+    await pool.query(`UPDATE users SET password = ? WHERE id = ?`, [
+      newPassword,
+      userId,
+    ]);
 
-    res.json({ 
-      success: true, 
-      message: "Password updated successfully" 
+    res.json({
+      success: true,
+      message: "Password updated successfully",
     });
-
   } catch (error) {
     console.error("Password update error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Internal server error" 
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
     });
   }
 }
-
-
-
-
 
 // Handle logout
 async function logout(req, res) {
@@ -310,9 +324,6 @@ async function logout(req, res) {
   res.clearCookie("user");
   return res.json({ message: "Successfully logged out" });
 }
-
-
-
 
 // const generateResetToken = (userId) => {
 //   return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "1h" });
@@ -323,9 +334,13 @@ const forgotPassword = async (req, res) => {
     const { email } = req.body;
 
     // Check if user exists
-    const [rows] = await pool.query(`SELECT id FROM users WHERE email = ?`, [email]);
+    const [rows] = await pool.query(`SELECT id FROM users WHERE email = ?`, [
+      email,
+    ]);
     if (rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Email not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Email not found" });
     }
 
     const userId = rows[0].id;
@@ -349,7 +364,6 @@ const forgotPassword = async (req, res) => {
     });
 
     res.json({ success: true, message: "Reset link sent to your email." });
-
   } catch (error) {
     console.error("Forgot password error:", error);
     res.status(500).json({ success: false, message: "Internal server error" });
@@ -362,17 +376,21 @@ const resetPassword = async (req, res) => {
     const { newPassword } = req.body;
 
     // Verify Token
-    const decoded = jwt.verify(token, secretKey);
+    const decoded = jwt.verify(token, restKey);
     const userId = decoded.id;
 
     // Update Password in Database (Without Hashing)
-    await pool.query(`UPDATE users SET password = ? WHERE id = ?`, [newPassword, userId]);
+    await pool.query(`UPDATE users SET password = ? WHERE id = ?`, [
+      newPassword,
+      userId,
+    ]);
 
     res.json({ success: true, message: "Password updated successfully." });
-
   } catch (error) {
     console.error("Reset password error:", error);
-    res.status(400).json({ success: false, message: "Invalid or expired token." });
+    res
+      .status(400)
+      .json({ success: false, message: "Invalid or expired token." });
   }
 };
 module.exports = {

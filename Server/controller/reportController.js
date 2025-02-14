@@ -42,8 +42,14 @@ const postReports = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: "Report file is required." });
     }
-
+    const [categoryRows] = await pool.execute(
+      `SELECT * FROM report_category WHERE id = ?`,
+      [category_id]
+    );
     // Check if the user exists
+    if (categoryRows.length === 0) {
+      return res.status(404).json({ success: false, message: "CATEGORY ID not found." });
+    }
     const [userRows] = await pool.execute(
       `SELECT * FROM users WHERE registrationId = ?`,
       [registration_id]
@@ -52,13 +58,15 @@ const postReports = async (req, res) => {
       return res.status(404).json({ success: false, message: "Registration ID not found." });
     }
 
+    const expireDate = categoryRows[0].expire_date
     const userId = userRows[0].id;
     const userName = userRows[0].name;
     // Prepare report data
     const reportData = {
       ...req.body, // Include other body data
       report_file: req.file.filename, // Add the uploaded file name
-      user_id: userId, // Add the user ID
+      user_id: userId,
+      expire_date: expireDate, 
     };
 
     // Insert the report into the database

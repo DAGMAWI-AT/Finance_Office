@@ -10,6 +10,8 @@ async function createReportTable() {
         report_name VARCHAR(255) NOT NULL,
         description TEXT,
         report_file VARCHAR(255) NOT NULL,
+        expire_date TIMESTAMP NULL DEFAULT NULL,
+        status ENUM('approve', 'pending', 'reject', 'new', 'inprogress') NOT NULL DEFAULT 'new',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, 
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
