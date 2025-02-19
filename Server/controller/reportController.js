@@ -79,15 +79,15 @@ const postReports = async (req, res) => {
     const reportId = reportResult.insertId;
 
     // Create the notification
-    await createNotificationsTable(); // Ensure the notifications table exists
+    await createNotificationsTable(); 
 
     const notificationMessage = `User ${userName} (Registration ID: ${registration_id}) has submitted a new report.`;
     const notificationData = {
       notification_message: notificationMessage,
-      registration_id: registration_id, // The user who submitted the report
-      report_id: reportId, // The ID of the newly created report
+      registration_id: registration_id,
+      report_id: reportId, 
       author: userName,
-      author_id: registration_id, // The author of the report
+      author_id: registration_id,
     };
 
     // Insert the notification into the database
@@ -100,7 +100,7 @@ const postReports = async (req, res) => {
     res.json({
       success: true,
       message: "Report added successfully.",
-      reportId: reportId, // Return the newly created report ID
+      reportId: reportId, 
     });
   } catch (error) {
     console.error("Error adding report:", error);
@@ -220,6 +220,60 @@ const getUserReportById = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
+// const updateReport = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const data = { ...req.body };
+
+//     // Handle file upload
+//     if (req.file) {
+//       // Save the new file to the user_report folder
+//       data.report_file = req.file.filename;
+
+//       // Delete the old file if it exists
+//       const [oldReport] = await pool.execute(
+//         `SELECT report_file FROM ${reportTable} WHERE id = ?`,
+//         [id]
+//       );
+//       if (oldReport.length > 0 && oldReport[0].report_file) {
+//         const oldFilePath = path.join(
+//           __dirname,
+//           "../public/user_report",
+//           oldReport[0].report_file
+//         );
+//         if (fs.existsSync(oldFilePath)) {
+//           fs.unlinkSync(oldFilePath); // Delete the old file
+//         }
+//       }
+//     }
+
+//     data.updated_at = new Date(); // Automatically set updated time
+
+//     // Build query dynamically
+//     const updateFields = Object.keys(data)
+//       .map((key) => `${key} = ?`)
+//       .join(", ");
+//     const values = [...Object.values(data), id];
+
+//     const [result] = await pool.execute(
+//       `UPDATE ${reportTable} SET ${updateFields} WHERE id = ?`,
+//       values
+//     );
+
+//     if (result.affectedRows === 0) {
+//       return res.status(404).json({ success: false, message: "Report not found" });
+//     }
+
+//     res.json({ success: true, message: "Report updated successfully." });
+//   } catch (error) {
+//     console.error("Error updating report:", error);
+//     res.status(500).json({ success: false, message: "Internal Server Error" });
+//   }
+// };
+
+// **Delete a report**
+
+
 const updateReport = async (req, res) => {
   try {
     const { id } = req.params;
@@ -227,7 +281,6 @@ const updateReport = async (req, res) => {
 
     // Handle file upload
     if (req.file) {
-      // Save the new file to the user_report folder
       data.report_file = req.file.filename;
 
       // Delete the old file if it exists
@@ -242,7 +295,7 @@ const updateReport = async (req, res) => {
           oldReport[0].report_file
         );
         if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath); // Delete the old file
+          fs.unlinkSync(oldFilePath);
         }
       }
     }
@@ -264,14 +317,56 @@ const updateReport = async (req, res) => {
       return res.status(404).json({ success: false, message: "Report not found" });
     }
 
+    // **Create notification for report update**
+    try {
+      // Get the report's registration_id
+      const [reportRows] = await pool.execute(
+        `SELECT registration_id FROM ${reportTable} WHERE id = ?`,
+        [id]
+      );
+      if (reportRows.length > 0) {
+        const registration_id = reportRows[0].registration_id;
+
+        // Fetch user details to get the name
+        let userName = 'Unknown User';
+        const [userRows] = await pool.execute(
+          `SELECT name FROM users WHERE registrationId = ?`,
+          [registration_id]
+        );
+        if (userRows.length > 0) {
+          userName = userRows[0].name;
+        }
+
+        // Ensure notifications table exists
+        await createNotificationsTable();
+
+        // Create notification message
+        const notificationMessage = `User ${userName} (Registration ID: ${registration_id}) has updated their report.`;
+        const notificationData = {
+          notification_message: notificationMessage,
+          registration_id: registration_id,
+          report_id: id,
+          author: userName,
+          author_id: registration_id,
+        };
+
+        // Insert the notification
+        await pool.query(
+          `INSERT INTO ${notificationTable} SET ?`,
+          [notificationData]
+        );
+      }
+    } catch (error) {
+      console.error("Error creating notification for report update:", error);
+      // Do not fail the request, just log the error
+    }
+
     res.json({ success: true, message: "Report updated successfully." });
   } catch (error) {
     console.error("Error updating report:", error);
     res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
-
-// **Delete a report**
 const deleteReport = async (req, res) => {
   try {
     const { id } = req.params;

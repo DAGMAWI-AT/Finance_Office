@@ -1,13 +1,35 @@
 const { pool } = require('../config/db');
 const { createBeneficiaryTable } = require("../model/beneficiary");
 const path = require('path');
-const fs = require('fs')
-// Create Beneficiary Table (if needed)
-createBeneficiaryTable();
+const fs = require('fs');
+const { validationResult } = require('express-validator'); // For input validation
+
+// Utility function to delete old files
+const deleteOldFile = async (filePath, folderPath) => {
+  if (filePath) {
+    const oldFilePath = path.join(folderPath, filePath);
+    try {
+      await fs.promises.access(oldFilePath); // Check if the file exists
+      await fs.promises.unlink(oldFilePath); // Delete the file
+    } catch (err) {
+      if (err.code !== 'ENOENT') { // Ignore file not found errors
+        console.error(`Error deleting old file: ${oldFilePath}`, err);
+        throw err;
+      }
+    }
+  }
+};
 
 // Create a new beneficiary
 exports.createBeneficiary = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+
   try {
+    createBeneficiaryTable();
+
     const {
       fullName,
       phone,
@@ -15,34 +37,73 @@ exports.createBeneficiary = async (req, res) => {
       kebele,
       location,
       wereda,
+      gender,
+      age,
+      school,
       kfleketema,
       houseNo,
     } = req.body;
 
-    // Extract file names only (not full path)
+    // Validate that age is not negative
+    if (parseInt(age) < 0) {
+      return res.status(400).json({ success: false, message: "Age cannot be negative" });
+    }
+
+    // Extract file names (if provided)
     const idFileName = req.files?.idFile ? req.files['idFile'][0].filename : null;
     const photoFileName = req.files?.photo ? req.files['photo'][0].filename : null;
 
-    const query = `
-      INSERT INTO beneficiaries 
-      (fullName, phone, email, kebele, location, wereda, kfleketema, houseNo, idFile, photo)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+    // Start a database transaction
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
 
-    const [result] = await pool.execute(query, [
-      fullName,
-      phone,
-      email,
-      kebele,
-      location,
-      wereda,
-      kfleketema,
-      houseNo,
-      idFileName,  // Store only the file name
-      photoFileName // Store only the file name
-    ]);
+    try {
+      // Insert new beneficiary WITHOUT the custom beneficiary_id
+      const query = `
+        INSERT INTO beneficiaries 
+        (fullName, phone, email, kebele, location, wereda, kfleketema, houseNo, gender, age, school, idFile, photo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
 
-    res.status(201).json({ success: true, message: "Beneficiary created successfully", data: result });
+      const [result] = await connection.execute(query, [
+        fullName,
+        phone,
+        email,
+        kebele,
+        location,
+        wereda,
+        kfleketema,
+        houseNo,
+        gender,
+        age,
+        school,
+        idFileName,
+        photoFileName
+      ]);
+
+      // Get the auto-increment ID generated for this record
+      const insertedId = result.insertId;
+
+      // Generate the custom beneficiary_id using the auto-increment value
+      const beneficiary_id = `LA-${insertedId.toString().padStart(5, "0")}`;
+
+      // Update the record with the generated beneficiary_id
+      await connection.execute(
+        "UPDATE beneficiaries SET beneficiary_id = ? WHERE id = ?",
+        [beneficiary_id, insertedId]
+      );
+
+      // Commit the transaction
+      await connection.commit();
+      connection.release();
+
+      res.status(201).json({ success: true, message: "Beneficiary created successfully", data: { beneficiary_id, insertedId } });
+    } catch (error) {
+      // Rollback the transaction in case of error
+      await connection.rollback();
+      connection.release();
+      throw error;
+    }
   } catch (error) {
     console.error('Error creating beneficiary:', error);
     res.status(400).json({ success: false, message: "Failed to create beneficiary", error: error.message });
@@ -74,9 +135,13 @@ exports.getBeneficiaryById = async (req, res) => {
   }
 };
 
-
-
+// Update a beneficiary
 exports.updateBeneficiary = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+
   try {
     const {
       fullName,
@@ -85,9 +150,17 @@ exports.updateBeneficiary = async (req, res) => {
       kebele,
       location,
       wereda,
+      gender,
+      age,
+      school,
       kfleketema,
       houseNo
     } = req.body;
+
+    // Validate that age is not negative
+    if (parseInt(age) < 0) {
+      return res.status(400).json({ success: false, message: "Age cannot be negative" });
+    }
 
     // Check if the beneficiary exists
     const [existing] = await pool.execute('SELECT idFile, photo FROM beneficiaries WHERE id = ?', [req.params.id]);
@@ -97,21 +170,6 @@ exports.updateBeneficiary = async (req, res) => {
 
     let idFilePath = existing[0].idFile;
     let photoFilePath = existing[0].photo;
-
-    // Utility function to delete old files
-    const deleteOldFile = async (filePath, folderPath) => {
-      if (filePath) {
-        const oldFilePath = path.join(folderPath, filePath);
-        try {
-          await fs.promises.access(oldFilePath); // Check if the file exists
-          await fs.promises.unlink(oldFilePath); // Delete the file
-        } catch (err) {
-          if (err.code !== 'ENOENT') { // Ignore file not found errors
-            console.error(`Error deleting old file: ${oldFilePath}`, err);
-          }
-        }
-      }
-    };
 
     // Handle ID file update
     if (req.files?.idFile) {
@@ -137,6 +195,9 @@ exports.updateBeneficiary = async (req, res) => {
         wereda = ?,
         kfleketema = ?,
         houseNo = ?,
+        gender = ?,
+        age = ?,
+        school = ?,
         idFile = ?,
         photo = ?
       WHERE id = ?
@@ -151,6 +212,9 @@ exports.updateBeneficiary = async (req, res) => {
       wereda,
       kfleketema,
       houseNo,
+      gender,
+      age,
+      school,
       idFilePath,
       photoFilePath,
       req.params.id
@@ -162,7 +226,6 @@ exports.updateBeneficiary = async (req, res) => {
     res.status(400).json({ success: false, message: "Failed to update beneficiary", error: error.message });
   }
 };
-
 
 // Delete a beneficiary by ID
 exports.deleteBeneficiary = async (req, res) => {
