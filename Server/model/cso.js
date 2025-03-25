@@ -15,7 +15,7 @@ async function createCsoTable() {
               sector VARCHAR(255) NOT NULL,
               location VARCHAR(255) NOT NULL,
               office VARCHAR(255) NOT NULL,
-              role ENUM('cso', 'admin', 'viewer') NOT NULL DEFAULT 'cso',
+              role ENUM('cso') NOT NULL DEFAULT 'cso',
               logo VARCHAR(255), -- Path to the logo file
               tin_certificate VARCHAR(255), -- Path to the TIN certificate file
               registration_certificate VARCHAR(255), -- Path to the registration certificate file

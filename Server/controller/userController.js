@@ -6,6 +6,7 @@ require("dotenv").config();
 const { createCsoTable, csoTable } = require("../model/cso");
 const { createStaffTable, staffTable } = require("../model/staff");
 const nodemailer = require("nodemailer");
+const bcrypt = require("bcrypt");
 
 const secretKey = process.env.JWT_secretKey;
 // if (!secretKey) {
@@ -29,30 +30,37 @@ const loginLimite = rateLimit({
   statusCode: 429, // Status code for rate limiting
   headers: true, // Include rate limiting headers in the response
 });
+
+
 // Handle login
 async function login(req, res) {
   try {
     const { registrationId, email, password } = req.body;
-
-    // Find user by registrationId
-    const [user] = await pool.query(
-      `SELECT * FROM ${usersTable} WHERE registrationId = ? AND email = ?`,
+    const [users] = await pool.query(
+      `SELECT * FROM users WHERE registrationId = ? AND email = ?`,
       [registrationId, email]
     );
 
-    if (user.length === 0) {
+    if (!users.length) {
       return res.status(404).json({
         success: false,
-        message: "No user found with the provided registration ID or Email.",
+        message: "No user found with the provided registration ID or email.",
       });
     }
-    if (user[0].status !== "active") {
+
+    const user = users[0];
+
+    if (user.status !== "active") {
       return res.status(403).json({
         success: false,
         message: "Your account is inactive. Please contact support.",
       });
     }
-    const isPasswordValid = password === user[0].password;
+
+    // Verify password (compare plain-text password with hashed password)
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
@@ -63,128 +71,126 @@ async function login(req, res) {
     // Generate JWT token
     const token = jwt.sign(
       {
-        id: user[0].id,
-        registrationId: user[0].registrationId,
-        role: user[0].role,
+        id: user.id,
+        registrationId: user.registrationId,
+        role: user.role,
       },
       secretKey,
       { expiresIn: "1h" }
     );
 
-    res.status(200).json({
-      success: true,
-      message: "Login successful.",
-      token: token,
-      role: user[0].role,
-      registrationId: user[0].registrationId,
-    });
+    // Cookie options
+    const cookieOptions = {
+      httpOnly: true, // Prevent access by JavaScript
+      secure: process.env.NODE_ENV === "production", // Send only over HTTPS in production
+      sameSite: "Strict", // Prevent CSRF
+      maxAge: 60 * 60 * 1000, // 1 hour
+      path: "/", // Accessible across the entire site
+    };
+
+    // Set cookie
+    res.cookie("token", token, cookieOptions);
+
+    // Return success response
+    return res.json({ success: true });
   } catch (error) {
+    console.error("Login error:", error);
     res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 }
 
-// Handle create account
+// async function me(req, res){
+//   const token = req.cookies.token;
+//   if (!token) {
+//     return res.status(401).json({
+//       success: false,
+//       message: "Unauthorized: No token found",
+//     });
+//   }
+//   try {
+//     const decoded = jwt.verify(token, secretKey);
+//     res.json({
+//       success: true,
+//       role: decoded.role,
+//       registrationId: decoded.registrationId,
+//       id: decoded.id,
+//     });
+//   } catch (error) {
+//     console.error("Error verifying token:", error);
+//     return res.status(401).json({
+//       success: false,
+//       message: "Unauthorized: Invalid token",
+//     });
+//   }
+// };
+
+async function me(req, res) {
+  const token = req.cookies.token;
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized: No token found",
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, secretKey);
+    res.json({
+      success: true,
+      role: decoded.role,
+      registrationId: decoded.registrationId,
+      id: decoded.id,
+    });
+  } catch (error) {
+    console.error("Error verifying token:", error);
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized: Invalid token",
+    });
+  }
+}
+
+
+
+// Create User Account
 async function createAccount(req, res) {
   try {
     await createUserTable();
-    await createStaffTable();
-    await createCsoTable();
+
     const { registrationId, password } = req.body;
-
-    // Validate input
     if (!registrationId || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Registration ID and password are required.",
-      });
+      return res.status(400).json({ success: false, message: "Registration ID and password are required." });
     }
 
-    // Check if the registrationId exists in csoTable and staffTable
-    const [dataRecord] = await pool.query(
-      `SELECT * FROM ${csoTable} WHERE registrationId = ?`,
-      [registrationId]
-    );
-
-    // Check if the registrationId exists in csoTable
-    const [csoRecord] = await pool.query(
-      `SELECT * FROM ${csoTable} WHERE registrationId = ?`,
-      [registrationId]
-    );
-
-    // If not found in csoTable, check staffTable
-    let staffRecord = [];
-    if (csoRecord.length === 0) {
-      [staffRecord] = await pool.query(
-        `SELECT * FROM ${staffTable} WHERE registrationId = ?`,
-        [registrationId]
-      );
+    // Check if the registrationId exists in CSO table
+    const [csoRecord] = await pool.query(`SELECT * FROM cso WHERE registrationId = ?`, [registrationId]);
+    if (!csoRecord.length) {
+      return res.status(404).json({ success: false, message: "CSO record not found for the provided registration ID." });
     }
 
-    // If not found in both tables, return 404 error
-    if (csoRecord.length === 0 && staffRecord.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message:
-          "No record found in both CSO and Staff tables for the provided registration ID.",
-      });
+    // Check if user already exists
+    const [existingUser] = await pool.query(`SELECT * FROM users WHERE registrationId = ?`, [registrationId]);
+    if (existingUser.length) {
+      return res.status(400).json({ success: false, message: "User already exists." });
     }
 
-    let usersTableExists = false;
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    try {
-      // Check if usersTable exists by querying the INFORMATION_SCHEMA
-      const [tableCheck] = await pool.query(
-        `SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?`,
-        [usersTable]
-      );
-
-      usersTableExists = tableCheck[0]?.count > 0;
-    } catch (err) {
-      console.error("Error checking table existence:", err);
-      throw err;
-    }
-
-    if (!usersTableExists) {
-      await createUserTable();
-    }
-    // Check if the user already exists in usersTable
-    const [existingUser] = await pool.query(
-      `SELECT * FROM ${usersTable} WHERE registrationId = ?`,
-      [registrationId]
-    );
-
-    if (existingUser.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: "An account already exists for the provided registration ID.",
-      });
-    }
-
-    // Prepare user account data
-    const userAccount = {
+    // Insert user into users table
+    await pool.query(`INSERT INTO users (registrationId, userId, name, email, role, status, password) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
       registrationId,
-      name: csoRecord[0]?.csoName || staffRecord[0]?.name, // Use name from csoTable if available
-      userId: `user-${Date.now()}`,
-      email: csoRecord[0]?.email || staffRecord[0]?.email, // Use email from csoTable if available
-      role: csoRecord[0]?.role || staffRecord[0]?.role, // Default role
-      status: "active",
-      password, // Store a hashed version of the password in production
-      createdAt: new Date(),
-    };
+      csoRecord[0].id,
+      csoRecord[0].csoName,
+      csoRecord[0].email,
+      csoRecord[0].role,
+      "active",
+      hashedPassword,
+    ]);
 
-    // Insert user account into usersTable
-    await pool.query(`INSERT INTO ${usersTable} SET ?`, [userAccount]);
-
-    res.json({
-      success: true,
-      message: "User account created successfully.",
-    });
+    res.json({ success: true, message: "User account created successfully." });
   } catch (error) {
     console.error("Error creating user account:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal Server Error",
-    });
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 }
 
@@ -265,11 +271,13 @@ const deleteUser = async (req, res) => {
   }
 };
 
+
 async function updatePassword(req, res) {
   try {
     const userId = req.user.id; // From JWT middleware
     const { currentPassword, newPassword } = req.body;
 
+    // Validate input
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
         success: false,
@@ -277,10 +285,8 @@ async function updatePassword(req, res) {
       });
     }
 
-    // Fetch user from database
-    const [rows] = await pool.query(`SELECT * FROM users WHERE id = ?`, [
-      userId,
-    ]);
+    // Fetch user from the database
+    const [rows] = await pool.query(`SELECT * FROM users WHERE id = ?`, [userId]);
 
     if (rows.length === 0) {
       return res.status(404).json({
@@ -291,17 +297,21 @@ async function updatePassword(req, res) {
 
     const user = rows[0]; // Get user data
 
-    // Skip password hashing (direct comparison)
-    if (currentPassword !== user.password) {
+    // Compare the current password with the hashed password in the database
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
         message: "Current password is incorrect",
       });
     }
 
-    // Directly update the password (no hashing)
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the password in the database
     await pool.query(`UPDATE users SET password = ? WHERE id = ?`, [
-      newPassword,
+      hashedPassword,
       userId,
     ]);
 
@@ -325,9 +335,6 @@ async function logout(req, res) {
   return res.json({ message: "Successfully logged out" });
 }
 
-// const generateResetToken = (userId) => {
-//   return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "1h" });
-// };
 
 const forgotPassword = async (req, res) => {
   try {
@@ -378,10 +385,11 @@ const resetPassword = async (req, res) => {
     // Verify Token
     const decoded = jwt.verify(token, restKey);
     const userId = decoded.id;
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Update Password in Database (Without Hashing)
     await pool.query(`UPDATE users SET password = ? WHERE id = ?`, [
-      newPassword,
+      hashedPassword,
       userId,
     ]);
 
@@ -405,4 +413,5 @@ module.exports = {
   loginLimite,
   resetPassword,
   forgotPassword,
+  me,
 };

@@ -15,7 +15,7 @@
 // module.exports = router;
 
 const express = require("express");
-const {login, createAccount, getUsers, getUsersId, updateUser, deleteUser, logout, updatePassword, loginLimite, forgotPassword, resetPassword } = require("../controller/userController");
+const {me,login, createAccount, getUsers, getUsersId, updateUser, deleteUser, logout, updatePassword, loginLimite, forgotPassword, resetPassword } = require("../controller/userController");
 const {getReportDashboard,  } = require("../controller/dashboard");
 
 const verifyToken = require("../middleware/authMiddleware");
@@ -25,7 +25,9 @@ const router = express.Router();
 router.post("/login", login);
 router.post("/logout", logout);
 router.post("/createAccount",  createAccount);
-router.get("/users", verifyToken, authorizeRoles("admin"), getUsers);
+router.get("/me", me);
+
+router.get("/users", verifyToken, authorizeRoles("admin","sup_admin"), getUsers);
 router.get("/res/dashboard", getReportDashboard);
 router.get("/:id", verifyToken, authorizeRoles("admin"), getUsersId);
 router.put('/update-password', verifyToken, updatePassword);

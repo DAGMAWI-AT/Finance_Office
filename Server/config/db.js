@@ -10,6 +10,8 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  connectTimeout: 10000, // 10 seconds timeout
+
 });
 // const pool = mysql.createPool({
 //   host: process.env.DB_HOST,
@@ -25,7 +27,7 @@ async function connectDB() {
   try {
     // const connection = await pool.getConnection();
     console.log("MySQL connected successfully");
-    // pool.release(); // Release the connection back to the pool
+    // connection.release(); // Release the connection back to the pool
   } catch (err) {
     console.error("MySQL connection failed:", err);
     process.exit(1);

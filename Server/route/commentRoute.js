@@ -1,27 +1,25 @@
 const express = require("express");
-const {
-  postComment,
-  getComments,
-  getCommentsForReport,
-  getCommentById,
-  editComment,
-  deleteComment,
-  uploadCommentFile,
-} = require("../controller/commentController");
 const router = express.Router();
-router.use("/comment", express.static("public/comment"));
+const {
+  addComment,
+  getCommentsByReport,
+  getCommentById,
+  updateComment,
+  deleteComment,
+  upload
+} = require("../controller/commentController");
+const verifyToken = require("../middleware/authMiddleware");
+// const upload = require("../config/multer"); // Your multer configuration
 
-// POST Comment
-router.post("/", uploadCommentFile.single("comment_file"), postComment);
+// POST - Create a new comment with file
+router.post("/", verifyToken, upload.single('comment_file'), addComment);
 
-// GET Comments for a Report
-router.get("/", getComments)
-router.get("/comment/:reportId", getCommentsForReport);
-router.get("/:id", getCommentById);
-// EDIT Comment
-router.put("/:commentId", editComment);
+// PUT - Update a comment with optional file
+router.put("/:id", verifyToken, upload.single('comment_file'), updateComment);
 
-// DELETE Comment
-router.delete("/:commentId", deleteComment);
+// (Keep other routes the same)
+router.get("/report/:reportId", verifyToken, getCommentsByReport);
+router.get("/:id", verifyToken, getCommentById);
+router.delete("/:id", verifyToken, deleteComment);
 
 module.exports = router;

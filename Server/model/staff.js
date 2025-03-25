@@ -1,5 +1,7 @@
-// model/staff.js
 const { pool } = require("../config/db");
+const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 async function createStaffTable() {
     try {
@@ -11,15 +13,19 @@ async function createStaffTable() {
             email VARCHAR(255) UNIQUE NOT NULL,
             phone VARCHAR(20),
             position VARCHAR(255),
-            role ENUM('admin', 'cso', 'viewer') DEFAULT 'admin',
+            role ENUM('admin', 'sup_admin') DEFAULT 'admin',
             photo VARCHAR(255),
+            password VARCHAR(255) NOT NULL,
             status ENUM('active', 'inactive') DEFAULT 'active',
+            email_verified BOOLEAN DEFAULT false,
+            reset_token VARCHAR(255),
+            reset_token_expiry TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, 
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`;
         await pool.query(query);
     } catch (error) {
-        console.error("Error creating staff table:", error);
+        console.errosr("Error creating staff table:", error);
         throw error;
     }
 }

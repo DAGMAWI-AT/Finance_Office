@@ -1,40 +1,89 @@
-const express = require("express");
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const path = require('path');
+const fs = require('fs');
+const util = require('util');
+const mkdirp = require('mkdirp');
 const { pool } = require("../config/db");
-const { createReportTable, reportTable } = require("../model/report");
-const {notificationTable, createNotificationsTable} = require("../model/notification");
+const multer = require("multer");
+const { reportTable, createReportTable } = require("../model/report");
+const { notificationTable, createNotificationsTable } = require("../model/notification");
 
-const app = express();
-app.use(express.json());
-app.use("/user_report", express.static(path.join(__dirname, "public/user_report")));
+// Promisify file system methods
+const renameAsync = util.promisify(fs.rename);
+const unlinkAsync = util.promisify(fs.unlink);
 
-const storageReport = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = "public/user_report";
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.fieldname + "_" + Date.now() + path.extname(file.originalname));
-  },
+// Base directory for all files
+const BASE_DIR = path.join(__dirname, '../public/cso_files');
+
+// Ensure base directory exists
+mkdirp.sync(BASE_DIR);
+
+// Helper function to get category details
+const getCategoryDetails = async (categoryId) => {
+  const [category] = await pool.query(
+    `SELECT category_name FROM report_category WHERE id = ?`,
+    [categoryId]
+  );
+  return category[0];
+};
+
+// Helper to create folder name directly from category name
+const getCategoryFolder = (categoryName) => {
+  // Replace invalid characters with underscores
+  return categoryName.replace(/[^a-zA-Z0-9-_]/g, '_');
+};
+
+// Multer memory storage configuration
+const storage = multer.memoryStorage(); 
+const uploadfile = multer({
+  storage: storage,
+  limits: { fileSize: 20 * 1024 * 1024 } // 10MB limit
 });
-const uploadfile = multer({ storage: storageReport });
 
 
-// **Create a new report**
-const postReports = async (req, res) => {
+// Process file and save it to the correct folder
+const processFile = async (file, folderName, report_name) => {
   try {
-    await createReportTable(); // Ensure the report table exists
+        if (!file) {
+          throw new Error("File upload failed: No file found in request.");
+        }
+    const destFolder = path.join(BASE_DIR, folderName);
+    mkdirp.sync(destFolder); // Ensure folder exists
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 8);
+    const ext = path.extname(file.originalname);
+    const filename = `${report_name}_${timestamp}_${randomStr}${ext}`;
+    const newFilePath = path.join(destFolder, filename);
+    // Write the file to disk
+    await fs.promises.writeFile(newFilePath, file.buffer);
+    // return path.join(folderName, filename); // Return relative path
+        return path.join(filename); // Return relative path
 
-    const { registration_id, category_id, author } = req.body;
+  } catch (error) {
+    console.error("Error processing file:", error);
+    return null; // Return null to indicate failure
+  }
+};
+
+// Create report
+const postReports = async (req, res) => {
+  let connection;
+  let reportFilePath = null; // Store the file path for cleanup in case of errors
+
+  try {
+    // Ensure report and notification tables exist
+    await createReportTable();
+    await createNotificationsTable();
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Report file is required or file size exceeds limit (20MB)."
+      });
+    }
+    const { registration_id, category_id, user_id, report_name } = req.body;
 
     // Validate required fields
-    if (!registration_id) {
-      return res.status(400).json({ success: false, message: "Registration ID is required." });
+    if (!registration_id || !user_id) {
+      return res.status(400).json({ success: false, message: "Registration ID and User ID are required." });
     }
     if (!category_id) {
       return res.status(400).json({ success: false, message: "Report category is required." });
@@ -42,78 +91,125 @@ const postReports = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: "Report file is required." });
     }
+
+    // Validate category
     const [categoryRows] = await pool.execute(
       `SELECT * FROM report_category WHERE id = ?`,
       [category_id]
     );
-    // Check if the user exists
+
     if (categoryRows.length === 0) {
       return res.status(404).json({ success: false, message: "CATEGORY ID not found." });
     }
+
+    // Validate user
     const [userRows] = await pool.execute(
-      `SELECT * FROM users WHERE registrationId = ?`,
-      [registration_id]
+      `SELECT * FROM users WHERE registrationId = ? AND id = ?`,
+      [registration_id, user_id]
     );
+
     if (userRows.length === 0) {
-      return res.status(404).json({ success: false, message: "Registration ID not found." });
+      return res.status(404).json({ success: false, message: "Registration ID or user ID not found." });
     }
 
-    const expireDate = categoryRows[0].expire_date
-    const userId = userRows[0].id;
-    const userName = userRows[0].name;
-    // Prepare report data
+    // Check if report already exists
+    const [reportRows] = await pool.execute(
+      `SELECT * FROM user_reports WHERE user_id = ? AND category_id = ? AND category_name = ? AND expire_date = ?`,
+      [user_id, category_id, categoryRows[0].category_name, categoryRows[0].expire_date]
+    );
+    const [reportRow] = await pool.execute(
+      `SELECT * FROM user_reports WHERE user_id = ? AND category_id = ?`,
+      [user_id, category_id]
+    );
+    if (reportRow.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "This report has already been submitted. Please update the previous report or wait until the submission period expires." 
+      });
+    }
+    if (reportRows.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "This report has already been submitted. Please update the previous report or wait until the submission period expires." 
+      });
+    }
+
+    // Handle file upload
+    const folderName = getCategoryFolder(categoryRows[0].category_name);
+    reportFilePath = await processFile(req.file, folderName, report_name);
+
+    if (!reportFilePath) {
+      return res.status(500).json({ success: false, message: "File upload failed. Please try again." });
+    }
+
     const reportData = {
-      ...req.body, // Include other body data
-      report_file: req.file.filename, // Add the uploaded file name
-      user_id: userId,
-      expire_date: expireDate, 
+      ...req.body,
+      report_file: reportFilePath, // Store relative path in the database
+      expire_date: categoryRows[0].expire_date,
+      category_name: categoryRows[0].category_name,
     };
 
-    // Insert the report into the database
-    const [reportResult] = await pool.query(
+    // Start database transaction
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // Insert report into database
+    const [reportResult] = await connection.query(
       `INSERT INTO ${reportTable} SET ?`,
       [reportData]
     );
 
-    // Get the newly created report ID
     const reportId = reportResult.insertId;
 
-    // Create the notification
-    await createNotificationsTable(); 
-
-    const notificationMessage = `User ${userName} (Registration ID: ${registration_id}) has submitted a new report.`;
+    // Insert notification
+    const notificationMessage = `User ${userRows[0].name} (Registration ID: ${registration_id}) has submitted a new report.`;
     const notificationData = {
       notification_message: notificationMessage,
       registration_id: registration_id,
-      report_id: reportId, 
-      author: userName,
+      report_id: reportId,
+      author: userRows[0].name,
       author_id: registration_id,
+      user_id: user_id,
     };
 
-    // Insert the notification into the database
-    await pool.query(
+    await connection.query(
       `INSERT INTO ${notificationTable} SET ?`,
       [notificationData]
     );
 
-    // Return success response
+    await connection.commit();
+    connection.release();
+
     res.json({
       success: true,
       message: "Report added successfully.",
-      reportId: reportId, 
+      reportId: reportId,
     });
   } catch (error) {
-    console.error("Error adding report:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error." });
+    // Rollback transaction in case of error
+    if (connection) {
+      await connection.rollback();
+      connection.release();
+    }
+
+    // Remove the uploaded file if any validation or database operation fails
+    if (reportFilePath) {
+      await unlinkAsync(path.join(BASE_DIR, reportFilePath)).catch((unlinkError) => {
+        console.error("Error deleting file:", unlinkError);
+      });
+    }
+
+    console.error("Error adding report:", error.message);
+    res.status(500).json({ success: false, message: error.message || "Internal Server Error." });
   }
 };
 
-// **Get all reports**
+
+
+// Get all reports
 const getUserReport = async (req, res) => {
   try {
-    // const connection = await pool.getConnection();
     const [rows] = await pool.execute(`SELECT * FROM ${reportTable} ORDER BY created_at DESC`);
-    // pool.release();
     res.json(rows);
   } catch (error) {
     console.error("Error fetching reports:", error);
@@ -121,7 +217,7 @@ const getUserReport = async (req, res) => {
   }
 };
 
-// **Get reports by registration ID**
+// Get report by registration ID
 const getReportByRegistrationId = async (req, res) => {
   try {
     const { registrationId } = req.params;
@@ -140,34 +236,19 @@ const getReportByRegistrationId = async (req, res) => {
   }
 };
 
-// const getReportByRegistrationId = async (registrationId) => {
-//   try {
-//     // Assuming you're using a query like this
-//     const reports = await pool.query('SELECT * FROM reports WHERE registration_id = ?', [registrationId]);
-    
-//     if (Array.isArray(reports) && reports.length > 0) {
-//       // Continue with your iteration logic (e.g., .map, .forEach, etc.)
-//     } else {
-//       console.error('No reports found');
-//       return []; // Return an empty array if no reports
-//     }
-//   } catch (error) {
-//     console.error('Error fetching reports:', error);
-//   }
-// };
-
+// Get reports by user ID
 const getReportsByUserId = async (req, res) => {
   try {
     const { userId } = req.params;
+
     if (!userId) {
       return res.status(400).json({ success: false, message: "User ID is required." });
     }
 
     const [rows] = await pool.execute(
-      `SELECT * FROM ${reportTable} WHERE user_id = ? ORDER BY created_at DESC`,
+      `SELECT * FROM user_reports WHERE user_id = ? ORDER BY created_at DESC`,
       [userId]
     );
-    // connection.release();
 
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: "No reports found for this user." });
@@ -179,15 +260,31 @@ const getReportsByUserId = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal Server Error." });
   }
 };
+
 // Get report by ID
 const getReportById = async (req, res) => {
   const id = req.params.id;
-  const userId = req.user.id; // Extract user ID from authenticated request
+
+  // Check if req.user is defined
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ success: false, message: "Unauthorized" });
+  }
+
+  const userId = req.user.id; // Get userId from req.user
 
   try {
-    const [report] = await pool.query(
-      `SELECT * FROM ${reportTable} WHERE id = ? AND user_id = ?`, 
-      [id, userId] // Ensure user can only access their own reports
+    const [reportExists] = await pool.execute(
+      `SELECT * FROM ${reportTable} WHERE id = ?`,
+      [id]
+    );
+
+    if (reportExists.length === 0) {
+      return res.status(404).json({ success: false, message: "Report not found" });
+    }
+
+    const [report] = await pool.execute(
+      `SELECT * FROM ${reportTable} WHERE id = ? AND user_id = ?`,
+      [id, userId]
     );
 
     if (report.length === 0) {
@@ -201,17 +298,18 @@ const getReportById = async (req, res) => {
   }
 };
 
+// Get report by ID (admin access)
 const getUserReportById = async (req, res) => {
   const id = req.params.id;
 
   try {
     const [report] = await pool.query(
-      `SELECT * FROM ${reportTable} WHERE id = ?`, 
-      [id] // Ensure user can only access their own reports
+      `SELECT * FROM ${reportTable} WHERE id = ?`,
+      [id]
     );
 
     if (report.length === 0) {
-      return res.status(403).json({ success: false, message: "Unauthorized access" });
+      return res.status(404).json({ success: false, message: "Report not found" });
     }
 
     res.json(report[0]);
@@ -220,177 +318,343 @@ const getUserReportById = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
-// const updateReport = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const data = { ...req.body };
 
-//     // Handle file upload
-//     if (req.file) {
-//       // Save the new file to the user_report folder
-//       data.report_file = req.file.filename;
-
-//       // Delete the old file if it exists
-//       const [oldReport] = await pool.execute(
-//         `SELECT report_file FROM ${reportTable} WHERE id = ?`,
-//         [id]
-//       );
-//       if (oldReport.length > 0 && oldReport[0].report_file) {
-//         const oldFilePath = path.join(
-//           __dirname,
-//           "../public/user_report",
-//           oldReport[0].report_file
-//         );
-//         if (fs.existsSync(oldFilePath)) {
-//           fs.unlinkSync(oldFilePath); // Delete the old file
-//         }
-//       }
-//     }
-
-//     data.updated_at = new Date(); // Automatically set updated time
-
-//     // Build query dynamically
-//     const updateFields = Object.keys(data)
-//       .map((key) => `${key} = ?`)
-//       .join(", ");
-//     const values = [...Object.values(data), id];
-
-//     const [result] = await pool.execute(
-//       `UPDATE ${reportTable} SET ${updateFields} WHERE id = ?`,
-//       values
-//     );
-
-//     if (result.affectedRows === 0) {
-//       return res.status(404).json({ success: false, message: "Report not found" });
-//     }
-
-//     res.json({ success: true, message: "Report updated successfully." });
-//   } catch (error) {
-//     console.error("Error updating report:", error);
-//     res.status(500).json({ success: false, message: "Internal Server Error" });
-//   }
-// };
-
-// **Delete a report**
-
-
-const updateReport = async (req, res) => {
+// Update report status
+const updateReportStatus = async (req, res) => {
   try {
+    await createNotificationsTable();
     const { id } = req.params;
-    const data = { ...req.body };
+    const { status, registration_id, author_id } = req.body;
 
-    // Handle file upload
-    if (req.file) {
-      data.report_file = req.file.filename;
-
-      // Delete the old file if it exists
-      const [oldReport] = await pool.execute(
-        `SELECT report_file FROM ${reportTable} WHERE id = ?`,
-        [id]
-      );
-      if (oldReport.length > 0 && oldReport[0].report_file) {
-        const oldFilePath = path.join(
-          __dirname,
-          "../public/user_report",
-          oldReport[0].report_file
-        );
-        if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath);
-        }
-      }
+    if (!status || !registration_id || !author_id) {
+      return res.status(400).json({ success: false, message: "Missing required fields." });
     }
 
-    data.updated_at = new Date(); // Automatically set updated time
+    const updatedAt = new Date();
+    const updateQuery = `
+      UPDATE ${reportTable}
+      SET status = ?, updated_at = ?
+      WHERE id = ?
+    `;
+    const [result] = await pool.execute(updateQuery, [status, updatedAt, id]);
 
-    // Build query dynamically
-    const updateFields = Object.keys(data)
-      .map((key) => `${key} = ?`)
-      .join(", ");
-    const values = [...Object.values(data), id];
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: "Report not found." });
+    }
+
+    const [staffRows] = await pool.execute(
+      "SELECT name FROM staff WHERE registrationId = ?",
+      [author_id]
+    );
+    const adminName = (staffRows && staffRows.length > 0) ? staffRows[0].name : "Unknown Admin";
+
+    const notificationMessage = `Report (ID: ${id}) status updated to "${status}" by ${adminName}.`;
+    const notificationData = {
+      notification_message: notificationMessage,
+      registration_id: registration_id,
+      report_id: id,
+      author: adminName,
+      author_id: author_id,
+    };
+
+    await pool.query(
+      `INSERT INTO ${notificationTable} SET ?`,
+      [notificationData]
+    );
+
+    res.json({ success: true, message: "Report status updated successfully." });
+  } catch (error) {
+    console.error("Error updating report status:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
+// Update report expire date
+const updateReportExpireDate = async (req, res) => {
+  const { id } = req.params;
+  const { expire_date, author_id, registration_id } = req.body;
+
+  try {
+    if (!expire_date || !author_id || !registration_id) {
+      return res.status(400).json({ success: false, message: "All fields are required." });
+    }
 
     const [result] = await pool.execute(
-      `UPDATE ${reportTable} SET ${updateFields} WHERE id = ?`,
-      values
+      `UPDATE ${reportTable} SET expire_date = ? WHERE id = ? AND registration_id = ?`,
+      [expire_date, id, registration_id]
     );
 
     if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: "Report not found or unauthorized access." });
+    }
+
+    res.json({ success: true, message: "Expire date updated successfully." });
+  } catch (error) {
+    console.error("Error updating expire date:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error." });
+  }
+};
+const updateReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    // const { category_id, expire_date } = req.body;
+    const { category_id, expire_date, report_name, description } = req.body;
+
+    const [existingReport] = await pool.execute(
+      `SELECT report_file, category_id FROM ${reportTable} WHERE id = ?`,
+      [id]
+    );
+
+    if (!existingReport || existingReport.length === 0) {
       return res.status(404).json({ success: false, message: "Report not found" });
     }
 
-    // **Create notification for report update**
-    try {
-      // Get the report's registration_id
-      const [reportRows] = await pool.execute(
-        `SELECT registration_id FROM ${reportTable} WHERE id = ?`,
-        [id]
+    const oldCategoryId = existingReport[0].category_id;
+    const oldFileName = existingReport[0].report_file;
+    if (req.file && oldFileName) {
+      const [oldCategoryRows] = await pool.execute(
+        `SELECT category_name FROM report_category WHERE id = ?`,
+        [oldCategoryId]
       );
-      if (reportRows.length > 0) {
-        const registration_id = reportRows[0].registration_id;
 
-        // Fetch user details to get the name
-        let userName = 'Unknown User';
-        const [userRows] = await pool.execute(
-          `SELECT name FROM users WHERE registrationId = ?`,
-          [registration_id]
-        );
-        if (userRows.length > 0) {
-          userName = userRows[0].name;
-        }
-
-        // Ensure notifications table exists
-        await createNotificationsTable();
-
-        // Create notification message
-        const notificationMessage = `User ${userName} (Registration ID: ${registration_id}) has updated their report.`;
-        const notificationData = {
-          notification_message: notificationMessage,
-          registration_id: registration_id,
-          report_id: id,
-          author: userName,
-          author_id: registration_id,
-        };
-
-        // Insert the notification
-        await pool.query(
-          `INSERT INTO ${notificationTable} SET ?`,
-          [notificationData]
-        );
+      if (!oldCategoryRows.length) {
+        return res.status(400).json({ success: false, message: "Invalid old category" });
       }
-    } catch (error) {
-      console.error("Error creating notification for report update:", error);
-      // Do not fail the request, just log the error
+
+      const oldCategoryName = getCategoryFolder(oldCategoryRows[0].category_name);
+      const oldFilePath = path.join(BASE_DIR, oldCategoryName, oldFileName);
+
+      // Delete the old file
+      if (fs.existsSync(oldFilePath)) {
+        fs.unlinkSync(oldFilePath); // Delete the file
+        // console.log(`Deleted old file: ${oldFilePath}`);
+      }
     }
+
+    if (category_id && category_id !== oldCategoryId) {
+      const [oldCategoryRows] = await pool.execute(
+        `SELECT category_name FROM report_category WHERE id = ?`,
+        [oldCategoryId]
+      );
+
+      const [newCategoryRows] = await pool.execute(
+        `SELECT category_name FROM report_category WHERE id = ?`,
+        [category_id]
+      );
+
+      if (!oldCategoryRows.length || !newCategoryRows.length) {
+        return res.status(400).json({ success: false, message: "Invalid category" });
+      }
+
+      const oldCategoryName = getCategoryFolder(oldCategoryRows[0].category_name);
+      const newCategoryName = getCategoryFolder(newCategoryRows[0].category_name);
+
+      const oldPath = path.join(BASE_DIR, oldCategoryName, oldFileName);
+      const newPath = path.join(BASE_DIR, newCategoryName, oldFileName);
+
+      try {
+        await mkdirp(path.dirname(newPath));
+        if (fs.existsSync(oldPath)) {
+          await renameAsync(oldPath, newPath);
+        }
+      } catch (err) {
+        console.error("Error moving file:", err);
+        return res.status(500).json({ success: false, message: "Error moving file." });
+      }
+    }
+
+    const [categoryRows] = await pool.execute(
+      `SELECT category_name, expire_date FROM report_category WHERE id = ?`,
+      [category_id]
+    );
+
+    if (!categoryRows.length) {
+      return res.status(400).json({ success: false, message: "Invalid category" });
+    }
+
+    const updatedData = {
+      report_name: report_name || existingReport[0].report_name, 
+      description: description || existingReport[0].description,
+      category_id,
+      category_name: categoryRows[0].category_name,
+      expire_date: expire_date || categoryRows[0].expire_date,
+      // report_file: req.file ? req.file.filename : existingReport[0].report_file,
+      report_file: req.file ? await processFile(req.file, getCategoryFolder(categoryRows[0].category_name), report_name) : existingReport[0].report_file
+     };
+
+    
+
+
+    await pool.execute(
+      `UPDATE ${reportTable} 
+       SET report_name = ?, description = ?, category_id = ?, category_name = ?, expire_date = ?, report_file = ? 
+       WHERE id = ?`,
+      [
+        updatedData.report_name,
+        updatedData.description,
+        updatedData.category_id,
+        updatedData.category_name,
+        updatedData.expire_date,
+        updatedData.report_file,
+        id,
+      ]
+    );
+
 
     res.json({ success: true, message: "Report updated successfully." });
   } catch (error) {
     console.error("Error updating report:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error" });
+    res.status(500).json({ success: false, message: "Internal Server Error." });
+
   }
 };
+
+// Delete report
 const deleteReport = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // const connection = await pool.getConnection();
-    const [rows] = await pool.execute(`SELECT report_file FROM ${reportTable} WHERE id = ?`, [id]);
+    const [report] = await pool.execute(
+      `SELECT report_file, category_id FROM ${reportTable} WHERE id = ?`,
+      [id]
+    );
 
-    if (rows.length === 0) {
-      // connection.release();
-      return res.status(404).json({ success: false, message: "Report not found" });
+    if (report.length === 0) {
+      return res.status(404).json({ success: false, message: "Report not found." });
     }
 
-    // Delete the file
-    const filePath = path.join(__dirname, "../public/user_report", rows[0].report_file);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    let filePath = "";
+    if (report[0].report_file) {
+      const [categoryRows] = await pool.execute(
+        `SELECT category_name FROM report_category WHERE id = ?`,
+        [report[0].category_id]
+      );
 
-    // Delete the record from the database
+      if (categoryRows.length > 0) {
+        const categoryName = getCategoryFolder(categoryRows[0].category_name);
+        filePath = path.join(BASE_DIR, categoryName, report[0].report_file);
+      }
+    }
+
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
     await pool.execute(`DELETE FROM ${reportTable} WHERE id = ?`, [id]);
-    // pool.release();
 
     res.json({ success: true, message: "Report deleted successfully." });
   } catch (error) {
     console.error("Error deleting report:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error" });
+    res.status(500).json({ success: false, message: "Internal Server Error." });
+  }
+};
+
+const getStatusCountByUserId = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required." });
+    }
+
+    const [rows] = await pool.execute(
+      `SELECT status, COUNT(*) AS count 
+       FROM ${reportTable} 
+       WHERE user_id = ? 
+       GROUP BY status`,
+      [userId]
+    );
+
+    // Initialize counts with default values
+    const counts = {
+      approve: 0,
+      pending: 0,
+      reject: 0,
+      new: 0,
+      inprogress: 0,
+      total: 0, // Add total reports count
+    };
+
+    // Populate counts from database results
+    rows.forEach(item => {
+      counts[item.status] = item.count;
+      counts.total += item.count; // Count total reports
+    });
+
+    res.json(counts); // Send formatted response
+  } catch (error) {
+    console.error("Error fetching report status count:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error." });
+  }
+};
+
+// const getCategory = async (req, res) => {
+//   try {
+//     const [rows] = await pool.execute(
+//       `SELECT category_name, COUNT(*) AS count 
+//        FROM ${reportTable} 
+//        GROUP BY category_name`
+//     );
+
+//     res.json({ success: true, reports: rows });
+//   } catch (error) {
+//     console.error("Error fetching categories:", error);
+//     res.status(500).json({ success: false, message: "Internal Server Error." });
+//   }
+// };
+// const getCategoryWithStatusCounts = async (req, res) => {
+//   try {
+//     const [rows] = await pool.execute(
+//       `SELECT rc.category_name, r.status, COUNT(*) AS count 
+//        FROM ${reportTable} r
+//        JOIN report_category rc ON r.category_id = rc.id
+//        GROUP BY rc.category_name, r.status`
+//     );
+
+//     // Organize data in the required format
+//     const groupedReports = rows.reduce((acc, row) => {
+//       const { category_name, status, count } = row;
+
+//       if (!acc[category_name]) {
+//         acc[category_name] = { new: 0, approved: 0, reject: 0, pending: 0, inprogress: 0 };
+//       }
+//       acc[category_name][status] = count; // Assign count to the correct status
+
+//       return acc;
+//     }, {});
+
+//     res.json({ success: true, reports: groupedReports });
+//   } catch (error) {
+//     console.error("Error fetching reports by category:", error);
+//     res.status(500).json({ success: false, message: "Internal Server Error." });
+//   }
+// };
+const getCategoryWithStatusCounts = async (req, res) => {
+  try {
+    // Fetch status counts directly from user_reports, grouped by category_name
+    const [rows] = await pool.execute(
+      `SELECT category_name, status, COUNT(*) AS count 
+       FROM user_reports 
+       GROUP BY category_name, status`
+    );
+
+    // Organize data in the required format
+    const groupedReports = rows.reduce((acc, row) => {
+      const { category_name, status, count } = row;
+
+      if (!acc[category_name]) {
+        acc[category_name] = { new: 0, approve: 0, reject: 0, pending: 0, inprogress: 0, total:0 };
+      }
+      acc[category_name][status] = count; // Assign count to the correct status
+      acc[category_name].total += count; // Add count to total
+
+      return acc;
+    }, {});
+
+    res.json({ success: true, reports: groupedReports });
+  } catch (error) {
+    console.error("Error fetching reports by category:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error." });
   }
 };
 
@@ -399,9 +663,13 @@ module.exports = {
   postReports,
   getUserReport,
   getReportByRegistrationId,
-  updateReport,
   getReportsByUserId,
-  getUserReportById,
   getReportById,
+  getUserReportById,
+  updateReport,
+  updateReportStatus,
+  updateReportExpireDate,
   deleteReport,
+  getStatusCountByUserId,
+  getCategoryWithStatusCounts
 };

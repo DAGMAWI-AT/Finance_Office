@@ -19,7 +19,21 @@ const deleteOldFile = async (filePath, folderPath) => {
     }
   }
 };
-
+const processFile = (req, fileField, folderName, reqBodyCsoName) => {
+  if (req.files && req.files[fileField] && req.files[fileField][0]) {
+    const destFolder = path.join(uploadFolder, folderName);
+    ensureFolderExists(destFolder);
+    const csoName = reqBodyCsoName ? reqBodyCsoName.replace(/\s+/g, "_") : "CSO";
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 8);
+    const ext = path.extname(req.files[fileField][0].originalname);
+    const filename = `${csoName}_${timestamp}_${randomStr}${ext}`;
+    const filePath = path.join(destFolder, filename);
+    fs.writeFileSync(filePath, req.files[fileField][0].buffer);
+    return folderName + "/" + filename;
+  }
+  return null;
+};
 // Create a new beneficiary
 exports.createBeneficiary = async (req, res) => {
   const errors = validationResult(req);
@@ -29,7 +43,6 @@ exports.createBeneficiary = async (req, res) => {
 
   try {
     createBeneficiaryTable();
-
     const {
       fullName,
       phone,
@@ -44,19 +57,29 @@ exports.createBeneficiary = async (req, res) => {
       houseNo,
     } = req.body;
 
-    // Validate that age is not negative
+
+
     if (parseInt(age) < 0) {
       return res.status(400).json({ success: false, message: "Age cannot be negative" });
     }
 
-    // Extract file names (if provided)
-    const idFileName = req.files?.idFile ? req.files['idFile'][0].filename : null;
-    const photoFileName = req.files?.photo ? req.files['photo'][0].filename : null;
-
-    // Start a database transaction
+    
+    const idFileName = processFile(req, "idFile", "idFiles", fullName);
+    const photoFileName = processFile(req, "photo", "photoFiles", fullName);
     const connection = await pool.getConnection();
     await connection.beginTransaction();
+    const [existingUser] = await connection.query(
+      `SELECT * FROM beneficiaries WHERE email = ? OR phone = ?`,
+      [email, phone]
+    );
 
+    if (existingUser.length > 0) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "An account already exists for the provided email or phone.",
+      });
+    }
     try {
       // Insert new beneficiary WITHOUT the custom beneficiary_id
       const query = `

@@ -1,34 +1,38 @@
 const express = require("express");
-const app = express();
-
+const router = express.Router();
 const {
-  uploadStaffPhoto,
-  registerStaff,
-  getStaff,
-  getStaffById,
-  getStaffByRegistrationId,
-  updateStaffByRegistrationId,
-  updateStaff,
-  updateStaffById,
-  deleteStaff,
+    registerStaff,
+    loginStaff,
+    logoutStaff,
+    getStaff,
+    getStaffById,
+    updateStaff,
+    deleteStaff,
+    verifyEmail,
+    forgotPassword,
+    me,
+    updatePassword,
+    uploadStaffPhoto,
+    resetPassword,
 } = require("../controller/staffController");
 const verifyToken = require("../middleware/authMiddleware");
-const path = require("path");
-app.use("/staff", express.static(path.join(__dirname, "public/staff")));
-app.use("/staff", express.static("public/staff"));
-
-
-const cors = require("cors");
-app.use(cors());
-const router = express.Router();
 
 router.post("/register", uploadStaffPhoto.single("photo"), registerStaff);
-router.get("/", getStaff);
-router.get("/:id", getStaffById);
-router.get("/byId/:registrationId", getStaffByRegistrationId);
-router.patch("/update/:id",uploadStaffPhoto.single("photo"), updateStaff);
-// router.put("/update/:registrationId", updateStaffByRegistrationId);
+router.post("/login", loginStaff);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password/:token", resetPassword);
 
-router.delete("/:id", uploadStaffPhoto.single("photo"), deleteStaff);
+router.post("/logout", logoutStaff);
+
+router.get("/staff", getStaff);
+router.get("/staff/:id", getStaffById);
+router.put("/update/:id", uploadStaffPhoto.single("photo"), updateStaff);
+router.put("/updatePassword", verifyToken, updatePassword);
+
+router.delete("/staff/:id", deleteStaff);
+// Add this route to your Express app
+router.get('/verify-email/:token', verifyEmail);
+router.get("/me", me);
+
 
 module.exports = router;

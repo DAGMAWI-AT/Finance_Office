@@ -9,7 +9,6 @@ const createNotificationController = async (req, res) => {
   try {
     await createNotificationsTable();
     const data = req.body;
-
     if (
       !data.message ||
       !data.registration_id ||
@@ -42,8 +41,8 @@ const createNotificationController = async (req, res) => {
 const getNotifications = async (req, res) => {
   try {
     await createNotificationsTable();
-    const [notification] = await pool.query(
-      `SELECT * FROM ${notificationTable}`
+    const [notification] = await pool.execute(
+      `SELECT * FROM notifications`
     );
     res.json(notification);
   } catch (error) {
@@ -55,16 +54,11 @@ const getNotifications = async (req, res) => {
 const getNotificationsByUserController = async (req, res) => {
   try {
     await createNotificationsTable();
-
     const { registrationId } = req.params;
-    // console.log("Fetching notifications for user:", registrationId);
-
-    // Fetch notifications for the user
     const [notifications] = await pool.query(
-      `SELECT * FROM ${notificationTable} WHERE registration_id = ? ORDER BY timestamp DESC`,
+      `SELECT * FROM notifications WHERE registration_id = ? ORDER BY timestamp DESC`,
       [registrationId]
     );
-    // console.log("Fetched notifications:", notifications);
 
     if (notifications.length === 0) {
       return res
@@ -75,7 +69,7 @@ const getNotificationsByUserController = async (req, res) => {
         });
     }
 
-    res.json({ data: notifications });
+    res.json(notifications);
   } catch (error) {
     console.log("Error fetching notifications:", error);
     res
@@ -92,7 +86,7 @@ const getNotificationsById = async (req, res) => {
   const id = req.params.id;
   try {
     const [notification] = await pool.query(
-      `SELECT * FROM ${notificationTable} WHERE id = ?`,
+      `SELECT * FROM notifications WHERE id = ?`,
       [id]
     );
     if (notification.length === 0) {
@@ -113,7 +107,7 @@ const markNotificationAsReadController = async (req, res) => {
 
     // Mark the notification as read
     const [result] = await pool.query(
-      `UPDATE ${notificationTable} SET \`read\` = TRUE WHERE id = ?`, // Use backticks
+      `UPDATE notifications SET \`read\` = TRUE WHERE id = ?`, // Use backticks
       [id]
     );
 
@@ -137,7 +131,7 @@ const deleteNotificationController = async (req, res) => {
 
     // Delete the notification
     const [result] = await pool.query(
-      `DELETE FROM ${notificationTable} WHERE id = ?`,
+      `DELETE FROM notifications WHERE id = ?`,
       [id]
     );
 

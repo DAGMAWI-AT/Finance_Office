@@ -12,10 +12,10 @@ async function createCommentsTable() {
                 comment_file VARCHAR(255),
                 commented_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, 
-                FOREIGN KEY (report_id) REFERENCES user_reports(id) ON DELETE CASCADE
+                FOREIGN KEY (report_id) REFERENCES applicationForm(id) ON DELETE CASCADE
                 )`;
                 await pool.query(query);
-    console.log("Comments table created or already exists.");
+    // console.log("Comments table created or already exists.");
   } catch (error) {
     console.error("Error creating Comments table:", error);
     throw error;

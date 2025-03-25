@@ -17,6 +17,8 @@ const postReportCategory = async (req, res) => {
         .status(400)
         .json({ success: false, massage: "expire data and category required" });
     }
+    data.category_name = data.category_name.toLowerCase();
+
     const [result] = await pool.query(
       `INSERT INTO ${reportCategoryTable} SET ?`,
       [data]
@@ -34,17 +36,69 @@ const postReportCategory = async (req, res) => {
 };
 
 // Get all active report categories (excluding expired ones)
+// const getReportCategory = async (req, res) => {
+//   const { user_id } = req.query;
+
+//   if (!user_id) {
+//     return res.status(400).json({ success: false, message: "User ID is required." });
+//   }
+
+//   try {
+//     const [result] = await pool.execute(
+//       `SELECT rc.* 
+//        FROM ${reportCategoryTable} rc
+//        LEFT JOIN user_reports ur 
+//        ON rc.id = ur.category_id AND ur.user_id = ? 
+//        WHERE (rc.expire_date IS NULL OR rc.expire_date > NOW()) 
+//        AND (ur.id IS NULL OR ur.expire_date != rc.expire_date) OR rc.id != ur.category_id
+//        ORDER BY rc.created_at DESC`,
+//       [user_id]
+//     );
+
+//     res.json(result);
+//   } catch (error) {
+//     console.error("Error fetching report categories:", error);
+//     res.status(500).json({ success: false, message: "Internal Server Error" });
+//   }
+// };
 const getReportCategory = async (req, res) => {
+  const { user_id } = req.query;
+
+  if (!user_id) {
+    return res.status(400).json({ success: false, message: "User ID is required." });
+  }
+
   try {
     const [result] = await pool.execute(
-      `SELECT * FROM ${reportCategoryTable} WHERE expire_date IS NULL OR expire_date > NOW() ORDER BY created_at DESC`
+      `SELECT rc.* 
+       FROM ${reportCategoryTable} rc
+       WHERE (rc.expire_date IS NULL OR rc.expire_date > NOW()) 
+       AND NOT EXISTS (
+         SELECT 1 FROM user_reports ur 
+         WHERE ur.category_id = rc.id AND ur.user_id = ?
+       )
+       ORDER BY rc.created_at DESC`,
+      [user_id]
     );
+
     res.json(result);
   } catch (error) {
     console.error("Error fetching report categories:", error);
     res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
+
+// const getReportsCategory = async (req, res) => {
+//   try {
+//     const [result] = await pool.execute(
+//       `SELECT * FROM ${reportCategoryTable} WHERE expire_date IS NULL OR expire_date > NOW() ORDER BY created_at DESC`
+//     );
+//     res.json(result);
+//   } catch (error) {
+//     console.error("Error fetching report categories:", error);
+//     res.status(500).json({ success: false, message: "Internal Server Error" });
+//   }
+// };
 const getReportsCategory = async (req, res) => {
   try {
     // const [result] = await pool.execute(
@@ -67,6 +121,15 @@ const getReportCategoryById = async (req, res) => {
       `SELECT * FROM ${reportCategoryTable} WHERE id = ?`,
       [id]
     );
+    // const [row] = await pool.execute(
+    //   `SELECT * FROM user_reports WHERE category_id = ?`,
+    //   [id]
+    // );
+    // if (row.length > 0) {
+    //   return res
+    //     .status(404)
+    //     .json({ success: false, message: "Category not found" });
+    // }
 
     if (result.length === 0) {
       return res
@@ -96,7 +159,7 @@ const updateReportCategory = async (req, res) => {
         .status(400)
         .json({ success: false, message: "No fields to update" });
     }
-
+    data.category_name = data.category_name.toLowerCase();
     data.updated_at = new Date(); // Automatically set updated time
     // Dynamically construct the SET clause
     const fields = Object.keys(data)

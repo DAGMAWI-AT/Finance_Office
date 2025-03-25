@@ -15,14 +15,22 @@ const verifyToken = require("../middleware/authMiddleware");
 const router = express.Router();
 
 // Serve static files
-router.use("/logos", express.static("public/logos"));
-router.use("/licenses", express.static("public/licenses"));
-router.use("/uploads", express.static("public/cso_files"));
+router.use("/cso_logo", express.static("public/cso_logo"));
+router.use("/cso_tin", express.static("public/cso_tin"));
+router.use("/cso_registration", express.static("public/cso_registration"));
 
+const uploadMiddleware = (req, res, next) => {
+  upload(req, res, (err) => {
+    if (err) {
+      // Handle Multer errors (like file size limit, etc.)
+      return res.status(400).json({ success: false, error: err.message });
+    }
+    next();
+  });
+};
 
-// Routes
-// router.post("/register", uploadLogo.single("logo"), registerCso);
-router.post("/register", upload, registerCso);
+// Then use the middleware:
+router.post("/register", uploadMiddleware, registerCso);
 router.get("/get", getCso);
 router.get("/:id", getCsoById);
 router.get("/res/:registrationId", getCsoByRegistrationId);

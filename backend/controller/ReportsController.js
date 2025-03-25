@@ -57,7 +57,7 @@ const uploadfile = multer({ storage: storageReport });
 //     }
 //   };
 
-const postReports = async (req, res) => {
+const CreateReports = async (req, res) => {
   try {
     // Extract registrationId from the request body
     const { registrationId, ...data } = req.body;
@@ -163,28 +163,12 @@ const getReportByRegistrationId = async (req, res) => {
   }
 };
 
-// const downloadReport = async (req, res) => {
-//   const fileName = req.params.pdfFile;
-//   const filePath = path.join(__dirname, "public/user_report", pdfFile);
 
-//   fs.access(filePath, fs.constants.F_OK, (err) => {
-//     if (err) {
-//       return res.status(404).json({ error: "File not found" });
-//     }
-
-//     res.download(filePath, fileName, (downloadErr) => {
-//       if (downloadErr) {
-//         console.error("Download error:", downloadErr);
-//         res.status(500).json({ error: "Error downloading file" });
-//       }
-//     });
-//   });
-// };
 
 module.exports = {
   uploadfile,
   getUserReport,
-  postReports,
+  CreateReports,
   getUserReportById,
   getReportByRegistrationId,
 };

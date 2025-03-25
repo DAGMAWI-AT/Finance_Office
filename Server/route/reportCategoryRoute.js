@@ -12,10 +12,10 @@ const {
 } = require("../controller/reportCategoryController");
 
 router.post("/upload", postReportCategory);
-router.get("/", getReportCategory);
+router.get("/category", getReportCategory);
 router.get("/cat", getReportsCategory);
 router.get("/:id", getReportCategoryById);
 router.put("/:id", updateReportCategory);
-router.delete("/:id", verifyToken, authorizeRoles(["admin"]), deleteReportCategory);
+router.delete("/:id", deleteReportCategory);
 
 module.exports = router;
