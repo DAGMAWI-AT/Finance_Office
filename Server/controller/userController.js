@@ -6,7 +6,8 @@ require("dotenv").config();
 const { createCsoTable, csoTable } = require("../model/cso");
 const { createStaffTable, staffTable } = require("../model/staff");
 const nodemailer = require("nodemailer");
-const bcrypt = require("bcrypt");
+// const bcrypt = require("bcrypt");
+const bcrypt = require('bcryptjs');
 
 const secretKey = process.env.JWT_secretKey;
 // if (!secretKey) {

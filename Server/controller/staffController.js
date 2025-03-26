@@ -1,6 +1,8 @@
 const express = require("express");
 const multer = require("multer");
-const bcrypt = require("bcrypt");
+// const bcrypt = require("bcrypt");
+const bcrypt = require('bcryptjs');
+
 const jwt = require("jsonwebtoken");
 const path = require("path");
 const { pool } = require("../config/db");
