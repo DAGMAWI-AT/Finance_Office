@@ -139,7 +139,7 @@ const pool = mysql.createPool({
   connectTimeout: 10000, // 10 seconds timeout
   waitForConnections: true,
   // connectTimeout: 60000, // Increase to 60 seconds
-  acquireTimeout: 60000, // Increase to 60 seconds
+  // acquireTimeout: 60000, // Increase to 60 seconds
   queueLimit: 0
 
 });
