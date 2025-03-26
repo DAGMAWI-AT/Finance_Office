@@ -41,7 +41,7 @@ const upload = multer({
   { name: "registration_certificate", maxCount: 1 },
 ]);
 
-// const baseURL = "http://localhost:5000/public/";
+// const baseURL = "${process.env.REACT_APP_API_URL}/public/";
 
 // This helper will write the file from memory to disk and return its URL.
 const processFile = (req, fileField, folderName, reqBodyCsoName) => {
@@ -180,7 +180,7 @@ const updateCso = async (req, res) => {
 
     // Base uploads directory and base URL (assumed to be defined globally)
     // const uploadFolder = path.join(__dirname, "..", "public");
-    // const baseURL = "http://localhost:5000/public/";
+    // const baseURL = "${process.env.REACT_APP_API_URL}/public/";
     // Helper to ensure folder exists (defined earlier)
     // function ensureFolderExists(folder) { ... }
 
