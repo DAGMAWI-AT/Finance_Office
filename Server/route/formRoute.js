@@ -40,5 +40,6 @@ router.delete('/application/:id', verifyToken, formController.deleteApplicationF
 router.put('/application', verifyToken, upload.single('application_file'), formController.submitApplicationForm);
 
 router.put('/applications/:id/update_permission', verifyToken, formController.updateApplicationUpdatePermission);
+router.get('/cso/application/:userId', verifyToken, formController.getApplicationFormsByUserId);
 
 module.exports = router;

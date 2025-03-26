@@ -50,6 +50,7 @@ exports.getAllFormsForAdmin = async (req, res) => {
     }
 };
 exports.getAllForms = async (req, res) => {
+    await createApplicationFormTable();
     try {
       const userId = req.user.id; // Assuming you have user authentication
   
@@ -167,6 +168,7 @@ exports.deleteForm = async (req, res) => {
 
 //// application form
 exports.getUserSubmission = async (req, res) => {
+    await createApplicationFormTable();
     try {
         const { form_id } = req.query;
         const userId = req.user.id;
@@ -183,6 +185,8 @@ exports.getUserSubmission = async (req, res) => {
     }
 };
 exports.getAllSubmission = async (req, res) => {
+    await createApplicationFormTable();
+
     try {
         const { form_id } = req.query;
         const userId = req.user.id;
@@ -207,6 +211,8 @@ exports.getAllSubmission = async (req, res) => {
     }
 };
 exports.getAllApplicationForms = async (req, res) => {
+    await createApplicationFormTable();
+
     try {
         const userId = req.user.id; // Get user ID from authentication
 
@@ -222,6 +228,8 @@ exports.getAllApplicationForms = async (req, res) => {
     }
 };
 exports.getApplicationFormById = async (req, res) => {
+    await createApplicationFormTable();
+
     try {
         const { id } = req.params;
         const userId = req.user.id;
@@ -256,7 +264,38 @@ exports.getApplicationFormById = async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 };
+exports.getApplicationFormsByUserId = async (req, res) => {
+    await createApplicationFormTable();
+
+    try {
+        const { userId } = req.params;
+        const userRole = req.user.role;
+
+        if (!userId || isNaN(userId)) {
+            return res.status(400).json({ error: 'Invalid user ID' });
+        }
+
+        let query = 'SELECT * FROM applicationForm WHERE cso_id = ?';
+        const params = [userId];
+
+        // For non-admin users, restrict to their own data
+        if (userRole !== 'admin' && userRole !== 'super_admin') {
+            if (req.user.id !== parseInt(user_id)) {
+                return res.status(403).json({ error: 'Unauthorized access' });
+            }
+        }
+
+        const [applicationForms] = await pool.execute(query, params);
+
+        res.json(applicationForms);
+    } catch (error) {
+        console.error('Error fetching application forms:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
 exports.updateApplicationStatus = async (req, res) => {
+    await createApplicationFormTable();
+
     try {
       const { id } = req.params;
       const { status } = req.body;
@@ -288,6 +327,8 @@ exports.updateApplicationStatus = async (req, res) => {
     }
 };
 exports.updateApplicationUpdatePermission = async (req, res) => {
+    await createApplicationFormTable();
+
     try {
       const { id } = req.params;
       const { update_permission } = req.body;
@@ -319,6 +360,8 @@ exports.updateApplicationUpdatePermission = async (req, res) => {
     }
 };
 exports.deleteApplicationForm = async (req, res) => {
+    await createApplicationFormTable();
+
     try {
         const { id } = req.params;
         const userId = req.user.id;
@@ -401,6 +444,8 @@ exports.submitApplicationForm = async (req, res) => {
 
         // Verify that the form exists and is not expired
         const [form] = await pool.query('SELECT * FROM forms WHERE id = ?', [form_id]);
+        const [row] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
+        // const [cso] = await pool.query('SELECT * FROM cso WHERE id = ?', [row.userId]);
 
         if (!form.length) {
             return res.status(404).json({ error: 'Form not found' });
@@ -459,9 +504,9 @@ exports.submitApplicationForm = async (req, res) => {
         } else {
             // Insert a new application
             const [result] = await pool.query(
-                `INSERT INTO applicationForm (user_id, form_id, form_name, report_name, description, application_file, expires_at, update_permission)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [userId, form_id, form[0].form_name, report_name, description, fileName, form[0].expires_at, "close"]
+                `INSERT INTO applicationForm (user_id, cso_id, form_id, form_name, report_name, description, application_file, expires_at, update_permission)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [userId, row[0].userId, form_id, form[0].form_name, report_name, description, fileName, form[0].expires_at, "close"]
             );
 
             return res.status(201).json({ success: true, id: result.insertId });

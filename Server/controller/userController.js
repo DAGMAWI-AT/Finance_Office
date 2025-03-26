@@ -73,6 +73,7 @@ async function login(req, res) {
       {
         id: user.id,
         registrationId: user.registrationId,
+        userId: user.userId,
         role: user.role,
       },
       secretKey,
@@ -139,6 +140,7 @@ async function me(req, res) {
       success: true,
       role: decoded.role,
       registrationId: decoded.registrationId,
+      userId: decoded.userId,
       id: decoded.id,
     });
   } catch (error) {

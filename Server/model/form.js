@@ -21,7 +21,8 @@ async function createApplicationFormTable() {
     try {
         const query = `CREATE TABLE IF NOT EXISTS applicationForm (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id INT NOT NULL,
+            user_id INT DEFAULT NULL,
+            cso_id INT NOT NULL,
             form_id INT DEFAULT NULL,
             form_name VARCHAR(255) NOT NULL,
             report_name VARCHAR(255) NOT NULL,
@@ -33,8 +34,9 @@ async function createApplicationFormTable() {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (form_id) REFERENCES forms(id) ON DELETE SET NULL ON UPDATE CASCADE,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
-        )`;
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE,  -- Added missing comma
+            FOREIGN KEY (cso_id) REFERENCES cso(id) ON DELETE CASCADE ON UPDATE CASCADE   -- Corrected syntax
+)`;
         await pool.query(query);
     } catch (error) {
         console.error("Error creating application form table:", error);

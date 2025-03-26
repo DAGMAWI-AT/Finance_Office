@@ -32,8 +32,8 @@ const uploadMiddleware = (req, res, next) => {
 // Then use the middleware:
 router.post("/register", uploadMiddleware, registerCso);
 router.get("/get", getCso);
-router.get("/:id", getCsoById);
-router.get("/res/:registrationId", getCsoByRegistrationId);
+router.get("/:id", verifyToken, getCsoById);
+router.get("/res/:user_id", getCsoByRegistrationId);
 router.patch("/update/:id", upload, updateCso);
 router.delete("/remove/:id", deleteCso);
 

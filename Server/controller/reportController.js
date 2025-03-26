@@ -559,8 +559,8 @@ const getStatusCountByUserId = async (req, res) => {
 
     const [rows] = await pool.execute(
       `SELECT status, COUNT(*) AS count 
-       FROM ${reportTable} 
-       WHERE user_id = ? 
+       FROM applicationForm 
+       WHERE cso_id = ? 
        GROUP BY status`,
       [userId]
     );
@@ -633,20 +633,20 @@ const getCategoryWithStatusCounts = async (req, res) => {
   try {
     // Fetch status counts directly from user_reports, grouped by category_name
     const [rows] = await pool.execute(
-      `SELECT category_name, status, COUNT(*) AS count 
-       FROM user_reports 
-       GROUP BY category_name, status`
+      `SELECT form_name, status, COUNT(*) AS count 
+       FROM applicationForm 
+       GROUP BY form_name, status`
     );
 
     // Organize data in the required format
     const groupedReports = rows.reduce((acc, row) => {
-      const { category_name, status, count } = row;
+      const { form_name, status, count } = row;
 
-      if (!acc[category_name]) {
-        acc[category_name] = { new: 0, approve: 0, reject: 0, pending: 0, inprogress: 0, total:0 };
+      if (!acc[form_name]) {
+        acc[form_name] = { new: 0, approve: 0, reject: 0, pending: 0, inprogress: 0, total:0 };
       }
-      acc[category_name][status] = count; // Assign count to the correct status
-      acc[category_name].total += count; // Add count to total
+      acc[form_name][status] = count; // Assign count to the correct status
+      acc[form_name].total += count; // Add count to total
 
       return acc;
     }, {});

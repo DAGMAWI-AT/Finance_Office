@@ -145,7 +145,7 @@ const getCso = async (req, res) => {
 const getCsoById = async (req, res) => {
   const id = req.params.id;
   try {
-    const [cso] = await pool.query(`SELECT * FROM ${csoTable} WHERE id = ?`, [id]);
+    const [cso] = await pool.query(`SELECT * FROM cso WHERE id = ?`, [id]);
     if (cso.length === 0) {
       return res.status(404).json({ success: false, message: "CSO not found" });
     }
@@ -278,11 +278,11 @@ const deleteCso = async (req, res) => {
 };
 
 const getCsoByRegistrationId = async (req, res) => {
-  const { registrationId } = req.params;
+  const { user_id } = req.params;
   try {
     const [cso] = await pool.query(
-      `SELECT * FROM ${csoTable} WHERE registrationId = ?`,
-      [registrationId]
+      `SELECT * FROM cso WHERE id = ?`,
+      [user_id]
     );
     if (cso.length === 0) {
       return res.status(404).json({ success: false, message: "CSO not found" });

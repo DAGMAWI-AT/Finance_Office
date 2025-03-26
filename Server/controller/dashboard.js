@@ -16,7 +16,7 @@ const getReportDashboard = async (req, res) => {
     const [cso] = await pool.query("SELECT COUNT(*) as count FROM cso");
 
     // Fetch total user reports
-    const [reports] = await pool.query("SELECT COUNT(*) as count FROM user_reports");
+    const [reports] = await pool.query("SELECT COUNT(*) as count FROM applicationForm");
 
     // Fetch total staff count
     const [staff] = await pool.query("SELECT COUNT(*) as count FROM staff");
