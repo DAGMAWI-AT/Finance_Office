@@ -59,102 +59,102 @@ app.use('/api', beneficiaryRoute);
 
 app.use('/api/form', formRoute);
 
-app.get('/health', async (req, res) => {
-  try {
-    const dbHealthy = await checkConnection();
-    res.status(200).json({
-      status: 'UP',
-      database: dbHealthy ? 'CONNECTED' : 'DISCONNECTED',
-      timestamp: new Date().toISOString()
-    });
-  } catch (err) {
-    res.status(503).json({
-      status: 'DOWN',
-      database: 'ERROR',
-      error: err.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-const PORT = process.env.PORT || 5000;
-
-async function initializeApp() {
-  try {
-    // 1. First attempt database connection
-    console.log('Connecting to database...');
-    await connectDB();
-    
-    // 2. Verify connection is actually working
-    console.log('Verifying database connection...');
-    const isConnected = await checkConnection();
-    if (!isConnected) {
-      throw new Error('Database connection verification failed');
-    }
-    
-    // 3. Start server only if DB is connected
-    const server = app.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-      console.log('Health check endpoint: http://localhost:${PORT}/health');
-    });
-
-    // 4. Handle server errors
-    server.on('error', (err) => {
-      console.error('Server error:', err);
-      process.exit(1);
-    });
-
-    // 5. Graceful shutdown
-    process.on('SIGTERM', () => {
-      console.log('SIGTERM received. Shutting down gracefully...');
-      server.close(() => {
-        pool.end().then(() => {
-          console.log('Database pool closed');
-          process.exit(0);
-        });
-      });
-    });
-
-    process.on('SIGINT', () => {
-      console.log('SIGINT received. Shutting down gracefully...');
-      server.close(() => {
-        pool.end().then(() => {
-          console.log('Database pool closed');
-          process.exit(0);
-        });
-      });
-    });
-
-  } catch (err) {
-    console.error('Application initialization failed:', err);
-    
-    // Attempt to close the pool if it exists
-    if (pool) {
-      try {
-        await pool.end();
-      } catch (poolErr) {
-        console.error('Error closing connection pool:', poolErr);
-      }
-    }
-    
-    process.exit(1); // Exit with failure code
-  }
-}
-
-
-initializeApp();
-
-
-
+// app.get('/health', async (req, res) => {
+//   try {
+//     const dbHealthy = await checkConnection();
+//     res.status(200).json({
+//       status: 'UP',
+//       database: dbHealthy ? 'CONNECTED' : 'DISCONNECTED',
+//       timestamp: new Date().toISOString()
+//     });
+//   } catch (err) {
+//     res.status(503).json({
+//       status: 'DOWN',
+//       database: 'ERROR',
+//       error: err.message,
+//       timestamp: new Date().toISOString()
+//     });
+//   }
+// });
 
 // const PORT = process.env.PORT || 5000;
+
 // async function initializeApp() {
-// await connectDB();
-// try{
-// app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
-// }catch{
-//   console.log("connection field") 
-// }
+//   try {
+//     // 1. First attempt database connection
+//     console.log('Connecting to database...');
+//     await connectDB();
+    
+//     // 2. Verify connection is actually working
+//     console.log('Verifying database connection...');
+//     const isConnected = await checkConnection();
+//     if (!isConnected) {
+//       throw new Error('Database connection verification failed');
+//     }
+    
+//     // 3. Start server only if DB is connected
+//     const server = app.listen(PORT, () => {
+//       console.log(`Server running on http://localhost:${PORT}`);
+//       console.log('Health check endpoint: http://localhost:${PORT}/health');
+//     });
+
+//     // 4. Handle server errors
+//     server.on('error', (err) => {
+//       console.error('Server error:', err);
+//       process.exit(1);
+//     });
+
+//     // 5. Graceful shutdown
+//     process.on('SIGTERM', () => {
+//       console.log('SIGTERM received. Shutting down gracefully...');
+//       server.close(() => {
+//         pool.end().then(() => {
+//           console.log('Database pool closed');
+//           process.exit(0);
+//         });
+//       });
+//     });
+
+//     process.on('SIGINT', () => {
+//       console.log('SIGINT received. Shutting down gracefully...');
+//       server.close(() => {
+//         pool.end().then(() => {
+//           console.log('Database pool closed');
+//           process.exit(0);
+//         });
+//       });
+//     });
+
+//   } catch (err) {
+//     console.error('Application initialization failed:', err);
+    
+//     // Attempt to close the pool if it exists
+//     if (pool) {
+//       try {
+//         await pool.end();
+//       } catch (poolErr) {
+//         console.error('Error closing connection pool:', poolErr);
+//       }
+//     }
+    
+//     process.exit(1); // Exit with failure code
+//   }
 // }
 
+
 // initializeApp();
+
+
+
+
+const PORT = process.env.PORT || 5000;
+async function initializeApp() {
+await connectDB();
+try{
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+}catch{
+  console.log("connection field") 
+}
+}
+
+initializeApp();
