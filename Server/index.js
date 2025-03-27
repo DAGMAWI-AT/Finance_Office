@@ -20,9 +20,13 @@ const app = express();
 const path = require("path");
 app.use(cookieParser()); // <-- This is critical for req.cookies to be available
 
+// app.use(cors({
+//   origin: ["http://localhost:3000"], // Allow requests from this origin
+//   credentials: true // Allow cookies to be sent
+// }));
 app.use(cors({
-  origin: ["http://localhost:3000"], // Allow requests from this origin
-  credentials: true // Allow cookies to be sent
+  origin: ["https://csosfinance1.netlify.app"], 
+  credentials: true 
 }));
 // Middleware
 app.use(bodyParser.json()); // Parse JSON request bodies
