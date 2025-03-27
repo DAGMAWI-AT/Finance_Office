@@ -24,16 +24,7 @@ app.use(cookieParser()); // <-- This is critical for req.cookies to be available
 //   origin: ["http://localhost:3000"], // Allow requests from this origin
 //   credentials: true // Allow cookies to be sent
 // }));
-const corsOptions = {
-  origin: ["https://csosfinance1.netlify.app"], // Allow frontend domain
-  credentials: true, // Allow cookies and authentication headers
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-  allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"]
-};
-
-app.use(cors(corsOptions));
-
-app.options("*", cors(corsOptions)); // Allow preflight requests
+app.use(cors({ origin: 'https://csosfinance1.netlify.app', credentials: true }));
 
 
 // Middleware
