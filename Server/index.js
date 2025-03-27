@@ -20,11 +20,11 @@ const app = express();
 const path = require("path");
 app.use(cookieParser()); // <-- This is critical for req.cookies to be available
 
-// app.use(cors({
-//   origin: ["http://localhost:3000"], // Allow requests from this origin
-//   credentials: true // Allow cookies to be sent
-// }));
-app.use(cors({ origin: 'https://csosfinance1.netlify.app', credentials: true }));
+app.use(cors({
+  origin: ["http://localhost:3000"], // Allow requests from this origin
+  credentials: true // Allow cookies to be sent
+}));
+// app.use(cors({ origin: 'https://csosfinance1.netlify.app', credentials: true }));
 // app.use(cors({
 //   origin: ["https://csosfinance1.netlify.app"], // Allow requests from this origin
 //   credentials: true // Allow cookies to be sent
