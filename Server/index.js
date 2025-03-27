@@ -25,7 +25,7 @@ app.use(cookieParser()); // <-- This is critical for req.cookies to be available
 //   credentials: true // Allow cookies to be sent
 // }));
 app.use(cors({
-  origin: ["https://csosfinance1.netlify.app"], 
+  origin: ["https://csosfinance1.netlify.app/"], 
   credentials: true 
 }));
 // Middleware
