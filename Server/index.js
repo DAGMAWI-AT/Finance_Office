@@ -24,14 +24,7 @@ app.use(cors({
   origin: ["http://localhost:3000"], // Allow requests from this origin
   credentials: true // Allow cookies to be sent
 }));
-// app.use(cors({ origin: 'https://csosfinance1.netlify.app', credentials: true }));
-// app.use(cors({
-//   origin: ["https://csosfinance1.netlify.app"], // Allow requests from this origin
-//   credentials: true // Allow cookies to be sent
-// }));
 
-// Middleware
-// app.use(cors());
 app.use(bodyParser.json()); // Parse JSON request bodies
 app.use("/comment", express.static("public/comments"));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
