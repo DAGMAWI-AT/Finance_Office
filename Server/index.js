@@ -24,14 +24,15 @@ app.use(cookieParser()); // <-- This is critical for req.cookies to be available
 //   origin: ["http://localhost:3000"], // Allow requests from this origin
 //   credentials: true // Allow cookies to be sent
 // }));
-const allowedOrigins = ["https://csosfinance1.netlify.app"];
+const corsOptions = {
+  origin: "https://csosfinance1.netlify.app", // Your frontend URL
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  credentials: true, // Allow cookies and authentication headers
+  allowedHeaders: "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+};
 
-app.use(
-  cors({
-    origin: allowedOrigins,  // Allow only your frontend domain
-    credentials: true,       // Enable cookies, sessions, or tokens
-  })
-);
+app.use(cors(corsOptions));
+
 // Middleware
 // app.use(cors());
 app.use(bodyParser.json()); // Parse JSON request bodies
